@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SearchTask" extends="Task">
+    <interface>
+        <field id="kind" type="string" />
+        <field id="query" type="string" />
+        <field id="catMap" type="assocarray" />
+        <field id="content" type="node" />
+        <field id="total" type="integer" />
+        <field id="errorMsg" type="string" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/SearchTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+</component>

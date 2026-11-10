@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="IndexTask" extends="Task">
+    <interface>
+        <field id="kind" type="string" />
+        <field id="server" type="string" />
+        <field id="user" type="string" />
+        <field id="pass" type="string" />
+        <field id="cats" type="array" />
+        <field id="progress" type="integer" />
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/IndexTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+</component>

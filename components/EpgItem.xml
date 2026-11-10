@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="EpgItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="itemHasFocus" type="boolean" onChange="onFocus" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/EpgItem.brs" />
+    <children>
+        <Rectangle id="bg" width="460" height="154" color="0x1B2430FF" />
+        <Rectangle id="accent" width="6" height="154" color="0x3B82F6FF" />
+        <Label id="badge" translation="[20,8]" width="110" font="font:SmallBoldSystemFont" color="0x3B82F6FF" />
+        <Label id="time" translation="[130,8]" width="316" horizAlign="right" font="font:SmallSystemFont" color="0xA9B6C6FF" />
+        <Rectangle id="progBg" translation="[20,42]" width="424" height="6" color="0x2B3645FF" visible="false" />
+        <Rectangle id="progFill" translation="[20,42]" width="0" height="6" color="0x2EA44FFF" visible="false" />
+        <Label id="title" translation="[20,52]" width="424" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="desc" translation="[20,90]" width="424" height="60" wrap="true" font="font:SmallSystemFont" color="0x9FB0C3FF" />
+    </children>
+</component>

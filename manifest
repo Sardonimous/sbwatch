@@ -1,0 +1,9 @@
+title=SBWatch
+subtitle=Xtream IPTV for Roku
+major_version=0
+minor_version=5
+build_version=00001
+mm_icon_focus_hd=pkg:/images/icon_focus_hd.png
+splash_color=#0B0F14
+splash_min_time=0
+ui_resolutions=fhd
