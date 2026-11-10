@@ -2,6 +2,8 @@
 
 An Xtream Codes live-TV client for Roku (BrightScript / SceneGraph), built for personal use and sideloading in developer mode.
 
+> **Built with Claude.** Most of SBWatch was designed and written by **Claude** (Anthropic's AI assistant) in conversation with the repository owner: the architecture, the BrightScript / SceneGraph code, the on-device search index, the grid guide, the icon and this README. The owner set the requirements, tested every build on a real Roku Ultra, and reported the bugs and ideas that shaped each version.
+
 SBWatch is only a player. You supply your own Xtream provider; no content or credentials are included in this repository.
 
 ## Features
@@ -40,6 +42,7 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Guide | Left/Right, Up/Down | programme / channel; OK watch; Rewind/FF page; Replay = now; `*` favorite; Back close |
 | Watching | Up / Down | previous / next channel |
 | Watching | Left | open the guide |
+| Watching (started from the guide) | Back | returns to the guide |
 | Watching | Replay | playback menu (guide, stream info, favorite, force HLS/TS) |
 | Watching | `*` | the Roku system Options menu (captions, audio) |
 
@@ -49,7 +52,7 @@ Closed captions: turn them on in the Roku Options menu (`*` while watching) or S
 - Search index: built in the Roku cache, category by category (progress top right), refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
 - Guide data comes from Xtream `get_short_epg`, per channel, cached 5 minutes. There is no provider-wide guide search (Xtream has none, and full XMLTV is too large for a Roku).
 - Stream resolution is shown only if the stream's playlist declares it; Roku does not expose decoder resolution to apps.
-- Favorites are stored in the Roku registry (about 20 KB), roughly 200 channels with logos.
+- Favorites and recently watched are stored in the Roku registry (about 20 KB, roughly 200 favorites with logos). The registry survives upgrading the sideloaded app, so they are kept across versions; only removing the app from the Roku clears them. Older saved formats are still read, and settings saved under the app's earlier name are picked up automatically.
 
 ## Layout
     manifest            Roku manifest
@@ -57,5 +60,8 @@ Closed captions: turn them on in the Roku Options menu (`*` while watching) or S
     components/         scene, guide, search, tasks, list items
     images/             channel icon
     build.sh            builds dist/SBWatch.zip
+
+## Credits
+Written by Claude (Anthropic) with the repository owner, who directed the project and tested it on hardware.
 
 Provider and trademark names belong to their owners. Use SBWatch only with content you are authorized to access.

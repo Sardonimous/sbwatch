@@ -26,10 +26,7 @@ end sub
 ' ---------------- index state ----------------
 
 function readIndexMeta(kind as String) as Object
-    path = "cachefs:/svidx_" + kind + ".meta"
-    fs = CreateObject("roFileSystem")
-    if not fs.Exists(path) then return invalid
-    s = ReadAsciiFile(path)
+    s = regRead("idxmeta_" + kind)
     if s = "" then return invalid
     j = ParseJson(s)
     if type(j) <> "roAssociativeArray" then return invalid
@@ -41,8 +38,6 @@ function indexState(kind as String) as String
     j = readIndexMeta(kind)
     if j = invalid then return "none"
     if toS(j.key) <> m.server + "|" + m.user then return "none"
-    fs = CreateObject("roFileSystem")
-    if not fs.Exists("cachefs:/svidx_" + kind + ".txt") then return "none"
     if Int(Val(toS(j.ver))) < 2 then return "stale"
     age = nowSecs() - Int(Val(toS(j.ts)))
     if age > 259200 then return "stale"
@@ -106,6 +101,8 @@ sub onIdxState(event as Object)
         showStatus("Search index failed: " + res.err, 6)
         return
     end if
+
+    regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), count: res.count, ver: 2, key: t.server + "|" + t.user }))
 
     q = m.pendingQuery
     m.pendingQuery = ""

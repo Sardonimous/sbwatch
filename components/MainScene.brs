@@ -22,6 +22,8 @@ sub init()
     m.nerd = m.top.findNode("nerd")
     m.nerdText = m.top.findNode("nerdText")
     m.status = m.top.findNode("status")
+    m.statusBar = m.top.findNode("statusBar")
+    m.playFromGuide = false
     m.epgTimer = m.top.findNode("epgTimer")
     m.ovTimer = m.top.findNode("ovTimer")
     m.statusTimer = m.top.findNode("statusTimer")
@@ -376,6 +378,7 @@ sub onChSelected(event as Object)
         idx = event.getData()
         closeGuide()
         if m.video.visible and idx = m.playingIndex then return
+        m.playFromGuide = true
         playChannel(idx)
         return
     end if
@@ -383,6 +386,7 @@ sub onChSelected(event as Object)
         showOverlay()
         return
     end if
+    m.playFromGuide = false
     playChannel(event.getData())
 end sub
 
@@ -617,7 +621,6 @@ sub stopPlayback()
     hideStatus()
     m.chList.setFocus(true)
     scheduleEpg()
-    showPendingResults()
 end sub
 
 sub zap(delta as Integer)
@@ -882,7 +885,10 @@ end sub
 
 sub showStatus(text as String, seconds as Integer)
     m.status.text = text
-    m.status.visible = true
+    y = 930
+    if m.video.visible and not m.guideOpen then y = 745
+    m.statusBar.translation = [0, y]
+    m.statusBar.visible = true
     m.statusTimer.control = "stop"
     if seconds > 0 then
         m.statusTimer.duration = seconds
@@ -891,12 +897,12 @@ sub showStatus(text as String, seconds as Integer)
 end sub
 
 sub hideStatus()
-    m.status.visible = false
+    m.statusBar.visible = false
     m.statusTimer.control = "stop"
 end sub
 
 sub onStatusTimer()
-    m.status.visible = false
+    m.statusBar.visible = false
 end sub
 
 ' ---------------------------------------------------------------------
@@ -930,6 +936,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if m.video.visible then
         if key = "back" then
             stopPlayback()
+            if m.playFromGuide then
+                m.playFromGuide = false
+                m.gKeep = true
+                openGuide()
+            else
+                showPendingResults()
+            end if
         else if key = "up" then
             zap(-1)
         else if key = "down" then

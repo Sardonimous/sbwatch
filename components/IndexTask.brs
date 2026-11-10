@@ -23,7 +23,6 @@ sub run()
     base = m.top.server + "/player_api.php?username=" + urlEnc(m.top.user) + "&password=" + urlEnc(m.top.pass) + "&action=" + action + "&category_id="
     tmp = "cachefs:/svidx_" + kind + ".tmp"
     fin = "cachefs:/svidx_" + kind + ".txt"
-    metaPath = "cachefs:/svidx_" + kind + ".meta"
     fs = CreateObject("roFileSystem")
     if fs.Exists(tmp) then fs.Delete(tmp)
 
@@ -89,7 +88,5 @@ sub run()
         m.top.result = { ok: false, count: count, err: "could not finalize cache file" }
         return
     end if
-    meta = { ts: nowSecs(), count: count, kind: kind, ver: 2, key: m.top.server + "|" + m.top.user }
-    WriteAsciiFile(metaPath, FormatJson(meta))
     m.top.result = { ok: true, count: count, err: "" }
 end sub

@@ -30,6 +30,7 @@ sub guideInit()
 
     m.guideOpen = false
     m.guideBuilt = false
+    m.gKeep = false
     m.gBase = 0
     m.gWin = 0
     m.gSel = 0
@@ -125,11 +126,16 @@ sub openGuide()
     end if
     if not m.guideBuilt then buildGuide()
 
-    now = nowSecs()
-    m.gBase = now - (now mod 1800)
-    m.gWin = m.gBase
-    m.gSel = now
-    m.gTop = 0
+    if m.gKeep and m.gBase > 0 then
+        m.gKeep = false
+    else
+        m.gKeep = false
+        now = nowSecs()
+        m.gBase = now - (now mod 1800)
+        m.gWin = m.gBase
+        m.gSel = now
+        m.gTop = 0
+    end if
     m.guideOpen = true
     m.overlay.visible = false
     m.guide.visible = true
