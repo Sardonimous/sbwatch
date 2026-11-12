@@ -8,6 +8,7 @@
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
     <script type="text/brightscript" uri="pkg:/components/Guide.brs" />
     <script type="text/brightscript" uri="pkg:/components/Search.brs" />
+    <script type="text/brightscript" uri="pkg:/components/Favorites.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
 
     <children>
@@ -15,7 +16,7 @@
 
         <Label id="title" text="SBWatch" translation="[60,40]" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
         <Label id="hint" translation="[60,1005]" width="1800" color="0x8A97A6FF"
-               text="OK: select/play   *: favorite / change provider   Search: first row of categories   Replay: filter categories / full guide   Right: scroll guide panel   Watching: Up/Down channel, Left: guide, Replay: menu" />
+               text="OK: select/play   *: favorite (Favorites list: move / remove) / change provider   Search: first row of categories   Replay: filter categories / full guide   Right: scroll guide panel   Watching: Up/Down channel, Left: guide, Replay: menu" />
 
         <LabelList id="catList" translation="[60,130]" itemSize="[520,56]" numRows="14"
                    vertFocusAnimationStyle="floatingFocus" color="0xC8D1DCFF" focusedColor="0xFFFFFFFF" />
@@ -74,5 +75,6 @@
         <Timer id="ovTimer" duration="5" repeat="false" />
         <Timer id="statusTimer" duration="3" repeat="false" />
         <Timer id="nerdTimer" duration="1" repeat="true" />
+        <Timer id="favTimer" duration="0.25" repeat="false" />
     </children>
 </component>

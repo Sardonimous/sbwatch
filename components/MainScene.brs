@@ -40,6 +40,7 @@ sub init()
 
     guideInit()
     searchInit()
+    favInit()
     m.devInfo = CreateObject("roDeviceInfo")
 
     m.tasks = []
@@ -364,6 +365,10 @@ sub onChFocused()
         drawGuide()
         return
     end if
+    if m.favMove <> invalid then
+        favMoveFocused()
+        return
+    end if
     if m.video.visible then
         ' while watching, moving the (hidden) list selection = change channel
         idx = m.chList.itemFocused
@@ -380,6 +385,10 @@ sub onChSelected(event as Object)
         if m.video.visible and idx = m.playingIndex then return
         m.playFromGuide = true
         playChannel(idx)
+        return
+    end if
+    if m.favMove <> invalid then
+        endFavMove(true)
         return
     end if
     if m.video.visible then
@@ -957,6 +966,15 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
+    if m.favMove <> invalid then
+        if key = "back" then
+            endFavMove(false)
+        else if key = "options" then
+            endFavMove(true)
+        end if
+        return true
+    end if
+
     if key = "back" then
         if m.epgList.isInFocusChain() then
             m.chList.setFocus(true)
@@ -969,7 +987,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "options" then
         if m.chList.isInFocusChain() then
             item = currentFocusedItem()
-            if item <> invalid then toggleFav(item.id, chanName(item), item.HDPosterUrl)
+            if item <> invalid then
+                if m.curCat = "__fav" then
+                    showFavMenu()
+                else
+                    toggleFav(item.id, chanName(item), item.HDPosterUrl)
+                end if
+            end if
         else
             beginLogin()
         end if
