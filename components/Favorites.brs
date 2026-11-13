@@ -61,18 +61,18 @@ end sub
 sub onFavMenu(event as Object)
     idx = event.getData()
     m.favDlg.close = true
-    pos = m.favMenuIdx
+    fpos = m.favMenuIdx
     c = m.chList.content
     if c = invalid then return
-    item = c.getChild(pos)
+    item = c.getChild(fpos)
     if item = invalid then return
 
     if idx = 0 then
-        startFavMove(pos)
+        startFavMove(fpos)
     else if idx = 1 then
         favs = loadList("favs")
-        if pos > 0 and pos < favs.Count() then
-            favs = favReorderArray(favs, pos, 0)
+        if fpos > 0 and fpos < favs.Count() then
+            favs = favReorderArray(favs, fpos, 0)
             saveList("favs", favs)
             m.chList.content = nodeFromList(favs)
             m.chList.jumpToItem = 0
@@ -83,8 +83,8 @@ sub onFavMenu(event as Object)
     end if
 end sub
 
-sub startFavMove(pos as Integer)
-    m.favMove = { idx: pos, startIdx: pos, orig: loadList("favs"), busy: false }
+sub startFavMove(fpos as Integer)
+    m.favMove = { idx: fpos, startIdx: fpos, orig: loadList("favs"), busy: false }
     showStatus("Moving channel:  Up / Down to reposition,  OK to drop,  Back to cancel", 0)
 end sub
 

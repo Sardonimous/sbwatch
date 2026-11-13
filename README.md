@@ -53,6 +53,7 @@ Closed captions: turn them on in the Roku Options menu (`*` while watching) or S
 - Search index: built in the Roku cache, category by category (progress top right), refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
 - Guide data comes from Xtream `get_short_epg`, per channel, cached 5 minutes. There is no provider-wide guide search (Xtream has none, and full XMLTV is too large for a Roku).
 - Stream resolution is shown only if the stream's playlist declares it; Roku does not expose decoder resolution to apps.
+- The category filter is remembered across restarts (clear it from the filter dialog).
 - Favorites can be reordered from the Favorites list (`*`); the order is saved immediately.
 - Favorites and recently watched are stored in the Roku registry (about 20 KB, roughly 200 favorites with logos). The registry survives upgrading the sideloaded app, so they are kept across versions; only removing the app from the Roku clears them. Older saved formats are still read, and settings saved under the app's earlier name are picked up automatically.
 

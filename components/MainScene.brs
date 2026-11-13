@@ -203,16 +203,24 @@ sub onCategories(event as Object)
         ch = root.getChild(i)
         m.allCats.push({ id: ch.id, title: ch.title })
     end for
-    m.catFilter = ""
+    m.catFilter = regRead("catfilter")
     m.catMap = {}
     for each cc in m.allCats
         m.catMap[cc.id] = cc.title
     end for
-    rebuildCats()
+    cnt = rebuildCats()
     m.chList.content = invalid
-    m.catList.jumpToItem = 2
+    if m.catFilter <> "" and cnt > 0 then
+        m.catList.jumpToItem = 4
+    else
+        m.catList.jumpToItem = 2
+    end if
     m.catList.setFocus(true)
-    showStatus(m.allCats.Count().ToStr() + " categories loaded", 4)
+    if m.catFilter <> "" then
+        showStatus("Filter '" + m.catFilter + "' restored: " + cnt.ToStr() + " of " + m.allCats.Count().ToStr() + " categories", 5)
+    else
+        showStatus(m.allCats.Count().ToStr() + " categories loaded", 4)
+    end if
     maybeBuildIndex()
 end sub
 
@@ -284,6 +292,7 @@ sub onFilterButton(event as Object)
         m.catFilter = LCase(txt.Trim())
     end if
 
+    regWrite("catfilter", m.catFilter)
     cnt = rebuildCats()
     if cnt > 0 then
         m.catList.jumpToItem = 4
