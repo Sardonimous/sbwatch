@@ -133,3 +133,12 @@ sub endFavMove(keep as Boolean)
         showStatus("Move cancelled", 2)
     end if
 end sub
+
+' Publishes the set of favorite channel ids so list items can show a star.
+sub refreshFavIds()
+    ids = {}
+    for each e in loadList("favs")
+        ids[e.id] = true
+    end for
+    m.global.favIds = ids
+end sub

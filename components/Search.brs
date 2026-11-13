@@ -40,6 +40,7 @@ function indexState(kind as String) as String
     if toS(j.key) <> m.server + "|" + m.user then return "none"
     if Int(Val(toS(j.ver))) < 2 then return "stale"
     age = nowSecs() - Int(Val(toS(j.ts)))
+    if Int(Val(toS(j.fails))) > 0 and age > 600 then return "stale"
     if age > 259200 then return "stale"
     return "ok"
 end function
@@ -102,14 +103,16 @@ sub onIdxState(event as Object)
         return
     end if
 
-    regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), count: res.count, ver: 2, key: t.server + "|" + t.user }))
+    regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), count: res.count, fails: res.fails, ver: 2, key: t.server + "|" + t.user }))
 
     q = m.pendingQuery
     m.pendingQuery = ""
     if q <> "" then
         runSearchTask(q)
     else
-        showStatus("Search index ready: " + res.count.ToStr() + " channels", 4)
+        note = ""
+        if res.fails > 0 then note = "  (" + res.fails.ToStr() + " categories could not be read)"
+        showStatus("Search index ready: " + res.count.ToStr() + " channels" + note, 5)
     end if
 end sub
 
@@ -128,9 +131,8 @@ end sub
 sub openSearchDialog()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Search"
-    dlg.message = ["Channels = whole provider.  Guide = programme titles in the channel list that is open now."]
     dlg.text = m.lastQuery
-    dlg.buttons = ["Channels", "Guide (this list)", "Rebuild index", "Cancel"]
+    dlg.buttons = ["Search channels", "Search guide (this list)", "Rebuild index"]
     dlg.observeField("buttonSelected", "onSearchButton")
     m.sdlg = dlg
     m.top.dialog = dlg
@@ -142,7 +144,6 @@ sub onSearchButton(event as Object)
     if txt = invalid then txt = ""
     m.sdlg.close = true
 
-    if idx = 3 then return
     if idx = 2 then
         startIndexBuild()
         return
@@ -212,6 +213,7 @@ sub onSearchDone(event as Object)
     node = t.content
     shown = node.getChildCount()
     label = t.total.ToStr() + " channels match '" + q + "'"
+    if t.total = 0 then label = zeroNote(q, t.indexed)
     if t.total > shown then label = "Showing " + shown.ToStr() + " of " + t.total.ToStr() + " channels matching '" + q + "' - refine your search"
     deliverResults(node, label, "No channels match '" + q + "'")
 end sub
@@ -346,3 +348,16 @@ sub showPendingResults()
     m.pendingResults = invalid
     deliverResults(r.node, r.label, r.emptyMsg)
 end sub
+
+' Explains an empty result: how big the index is and whether it is incomplete.
+function zeroNote(q as String, indexed as Integer) as String
+    s = "0 of " + indexed.ToStr() + " indexed channels match '" + q + "'"
+    j = readIndexMeta("live")
+    if j <> invalid then
+        expected = Int(Val(toS(j.count)))
+        fails = Int(Val(toS(j.fails)))
+        if fails > 0 then s = s + " - index incomplete (" + fails.ToStr() + " categories failed): use Rebuild index"
+        if expected > 0 and indexed < expected then s = s + " - index has " + indexed.ToStr() + " of " + expected.ToStr() + " entries: use Rebuild index"
+    end if
+    return s
+end function

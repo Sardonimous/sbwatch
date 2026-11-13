@@ -33,6 +33,16 @@ sub run()
     cap = 500
 
     lines = txt.Tokenize(Chr(10))
+    parsed = 0
+    for each ln in lines
+        if Instr(1, ln, sep) > 0 then parsed = parsed + 1
+    end for
+    m.top.indexed = parsed
+    if parsed = 0 then
+        m.top.errorMsg = "index missing"
+        return
+    end if
+
     for each ln in lines
         p1 = Instr(1, ln, sep)
         if p1 > 0 then

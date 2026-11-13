@@ -52,6 +52,7 @@ sub buildGuide()
     m.gChBg = []
     m.gChLbl = []
     m.gChLogo = []
+    m.gChStar = []
     m.gBg = []
     m.gTt = []
     m.gTm = []
@@ -70,7 +71,7 @@ sub buildGuide()
 
         cl = CreateObject("roSGNode", "Label")
         cl.translation = [m.gChanX + 84, y]
-        cl.width = m.gChanW - 96
+        cl.width = m.gChanW - 130
         cl.height = m.gRowH - 8
         cl.vertAlign = "center"
         cl.font = "font:MediumSystemFont"
@@ -89,6 +90,16 @@ sub buildGuide()
         lg.visible = false
         m.gRowsG.appendChild(lg)
         m.gChLogo.push(lg)
+
+        sr = CreateObject("roSGNode", "Poster")
+        sr.uri = "pkg:/images/star.png"
+        sr.translation = [m.gChanX + m.gChanW - 40, y + 26]
+        sr.width = 28
+        sr.height = 28
+        sr.loadDisplayMode = "scaleToFit"
+        sr.visible = false
+        m.gRowsG.appendChild(sr)
+        m.gChStar.push(sr)
 
         for ci = 0 to m.gPer - 1
             bg = CreateObject("roSGNode", "Rectangle")
@@ -295,6 +306,11 @@ sub drawGuide()
             m.gChLbl[r].text = chanName(item)
             m.gChLbl[r].visible = true
             setLogo(m.gChLogo[r], item.HDPosterUrl)
+            isFavRow = false
+            if m.global.showFavStars = true then
+                if m.global.favIds.DoesExist(id) then isFavRow = true
+            end if
+            m.gChStar[r].visible = isFavRow
 
             segs = rowSegments(id)
             si = segIndexAt(segs, m.gSel)
@@ -329,6 +345,7 @@ sub drawGuide()
             m.gChBg[r].visible = false
             m.gChLbl[r].visible = false
             m.gChLogo[r].visible = false
+            m.gChStar[r].visible = false
             for ci = 0 to m.gPer - 1
                 m.gBg[base + ci].visible = false
                 m.gTt[base + ci].visible = false

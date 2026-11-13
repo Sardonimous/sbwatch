@@ -41,6 +41,8 @@ sub init()
     guideInit()
     searchInit()
     favInit()
+    m.global.addFields({ favIds: {}, showFavStars: true })
+    refreshFavIds()
     m.devInfo = CreateObject("roDeviceInfo")
 
     m.tasks = []
@@ -348,6 +350,9 @@ sub onStreams(event as Object)
 end sub
 
 sub showChannels(node as Object, emptyMsg as String)
+    showStars = true
+    if m.curCat = "__fav" then showStars = false
+    m.global.showFavStars = showStars
     m.chList.content = node
     n = node.getChildCount()
     if n = 0 then
@@ -868,6 +873,7 @@ sub toggleFav(id as String, title as String, iconIn as Dynamic)
         showStatus("Favorites list is full (registry limit)", 4)
         return
     end if
+    refreshFavIds()
     showStatus(note, 3)
 
     if m.curCat = "__fav" and not m.video.visible then

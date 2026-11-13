@@ -25,8 +25,8 @@
 
         <Rectangle id="panel" translation="[1380,130]" width="480" height="784" color="0x141B24FF" />
         <Rectangle id="panelAccent" translation="[1380,130]" width="480" height="4" color="0x2EA44FFF" />
-        <Poster id="chLogo" translation="[1400,150]" width="64" height="36" visible="false" loadDisplayMode="scaleToFit" loadWidth="128" loadHeight="72" />
-        <Label id="chName" translation="[1476,142]" width="364" height="64" wrap="true" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Poster id="chLogo" translation="[1400,170]" width="64" height="36" visible="false" loadDisplayMode="scaleToFit" loadWidth="128" loadHeight="72" />
+        <Label id="chName" translation="[1476,142]" width="364" height="64" wrap="true" vertAlign="bottom" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
         <Label id="epgText" translation="[1400,230]" width="440" height="200" wrap="true" font="font:SmallSystemFont" color="0xC8D1DCFF" />
         <MarkupList id="epgList" translation="[1390,215]" itemComponentName="EpgItem" itemSize="[460,154]" itemSpacing="[0,8]" numRows="4"
                     vertFocusAnimationStyle="floatingFocus" visible="false" />
@@ -53,8 +53,8 @@
 
         <Group id="overlay" visible="false">
             <Rectangle translation="[0,840]" width="1920" height="240" color="0x000000B8" />
-            <Poster id="ovLogo" translation="[80,874]" width="88" height="48" visible="false" loadDisplayMode="scaleToFit" loadWidth="176" loadHeight="96" />
-            <Label id="ovName" translation="[184,870]" width="1656" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+            <Poster id="ovLogo" translation="[80,878]" width="88" height="48" visible="false" loadDisplayMode="scaleToFit" loadWidth="176" loadHeight="96" />
+            <Label id="ovName" translation="[184,870]" width="1656" height="56" vertAlign="bottom" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
             <Label id="ovEpg" translation="[80,950]" width="1760" height="100" wrap="true" font="font:MediumSystemFont" color="0xE0E6EDFF" />
         </Group>
 

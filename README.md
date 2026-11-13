@@ -9,6 +9,7 @@ SBWatch is only a player. You supply your own Xtream provider; no content or cre
 ## Features
 - Xtream login (server URL, username, password), saved on the Roku
 - Categories with a name filter; channels load per category, so 30,000-channel providers stay within Roku memory limits
+- A gold star marks channels that are in your Favorites (on every list except Favorites itself, and in the guide)
 - Channel logos next to channel names (list, guide, now/next panel, playback banner)
 - Now/next panel with colour-coded, scrollable programme cards
 - Full time-grid guide (fetched lazily for the visible rows only)
@@ -50,6 +51,7 @@ Credentials are stored in the Roku registry on the device, never in the package.
 Closed captions: turn them on in the Roku Options menu (`*` while watching) or Settings > Accessibility > Captions. They work when the stream carries CEA-608/708 captions or HLS WebVTT subtitles.
 
 ## Notes
+- Search dialog: **Search channels**, **Search guide (this list)**, **Rebuild index** (Back closes the dialog). An empty channel search reports how many channels are indexed and whether the index is incomplete.
 - Search index: built in the Roku cache, category by category (progress top right), refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
 - Guide data comes from Xtream `get_short_epg`, per channel, cached 5 minutes. There is no provider-wide guide search (Xtream has none, and full XMLTV is too large for a Roku).
 - Stream resolution is shown only if the stream's playlist declares it; Roku does not expose decoder resolution to apps.
@@ -63,6 +65,9 @@ Closed captions: turn them on in the Roku Options menu (`*` while watching) or S
     components/         scene, guide, search, tasks, list items
     images/             channel icon
     build.sh            builds dist/SBWatch.zip
+
+## Development
+`python3 tools/lint.py` runs a structural check (balanced blocks, undefined functions, reserved words used as variable names). `./build.sh` builds `dist/SBWatch.zip`.
 
 ## Credits
 Written by Claude (Anthropic) with the repository owner, who directed the project and tested it on hardware.

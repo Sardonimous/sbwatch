@@ -6,6 +6,7 @@
         <field id="catMap" type="assocarray" />
         <field id="content" type="node" />
         <field id="total" type="integer" />
+        <field id="indexed" type="integer" />
         <field id="errorMsg" type="string" />
     </interface>
     <script type="text/brightscript" uri="pkg:/components/SearchTask.brs" />
