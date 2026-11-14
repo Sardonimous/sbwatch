@@ -21,6 +21,8 @@ sub searchInit()
     m.esIds = {}
     m.pendingResults = invalid
     m.catMap = {}
+    m.autoRebuilt = false
+    m.partialRetried = false
 end sub
 
 ' ---------------- index state ----------------
@@ -40,7 +42,7 @@ function indexState(kind as String) as String
     if toS(j.key) <> m.server + "|" + m.user then return "none"
     if Int(Val(toS(j.ver))) < 2 then return "stale"
     age = nowSecs() - Int(Val(toS(j.ts)))
-    if Int(Val(toS(j.fails))) > 0 and age > 600 then return "stale"
+    if Int(Val(toS(j.fails))) > 0 and age > 600 and not m.partialRetried then return "stale"
     if age > 259200 then return "stale"
     return "ok"
 end function
@@ -74,6 +76,7 @@ sub startIndexBuild()
     m.idxTask = t
     m.idxTotal = ids.Count()
     m.idxBuilding = true
+    m.partialRetried = true
     m.idxLabel.text = "Indexing channels 0/" + m.idxTotal.ToStr()
     m.idxLabel.visible = true
     t.control = "RUN"
@@ -132,7 +135,7 @@ sub openSearchDialog()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Search"
     dlg.text = m.lastQuery
-    dlg.buttons = ["Search channels", "Search guide (this list)", "Rebuild index"]
+    dlg.buttons = ["Search channels", "Search program guide (current channel list)", "Rebuild channel search index"]
     dlg.observeField("buttonSelected", "onSearchButton")
     m.sdlg = dlg
     m.top.dialog = dlg
@@ -208,6 +211,22 @@ sub onSearchDone(event as Object)
             showStatus("Search failed: " + t.errorMsg, 5)
         end if
         return
+    end if
+
+    ' Self-heal: an index file with fewer entries than the build recorded is
+    ' truncated; rebuild it once per session and re-run the search.
+    if not m.autoRebuilt and t.indexed > 0 then
+        meta = readIndexMeta("live")
+        if meta <> invalid then
+            expected = Int(Val(toS(meta.count)))
+            if expected > 0 and t.indexed * 100 < expected * 99 then
+                m.autoRebuilt = true
+                m.pendingQuery = q
+                startIndexBuild()
+                showStatus("Search index was incomplete - rebuilding; your search will run when it is ready", 0)
+                return
+            end if
+        end if
     end if
 
     node = t.content

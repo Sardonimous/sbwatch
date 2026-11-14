@@ -160,6 +160,7 @@ sub closeGuide()
     m.guide.visible = false
     m.chList.setFocus(true)
     if not m.video.visible then scheduleEpg()
+    updateHint()
 end sub
 
 ' Segments of one row over [gBase, gBase + 12h]: programmes plus

@@ -37,7 +37,8 @@ Credentials are stored in the Roku registry on the device, never in the package.
 |---|---|---|
 | Lists | OK | open category / play channel |
 | Lists | Left / Right | move between category list, channel list, guide panel |
-| Category list | first row | Search; second row: filter categories (Replay also opens the filter) |
+| Category list | first rows | Search ...; Filter categories ... (the filter is remembered) |
+| Category list | Replay | open the search dialog |
 | Channel list | `*` | add / remove favorite |
 | Favorites list | `*` | menu: Move (Up/Down, OK to drop, Back to cancel), Move to top, Remove |
 | Channel list | Replay | open the full guide |
@@ -51,7 +52,8 @@ Credentials are stored in the Roku registry on the device, never in the package.
 Closed captions: turn them on in the Roku Options menu (`*` while watching) or Settings > Accessibility > Captions. They work when the stream carries CEA-608/708 captions or HLS WebVTT subtitles.
 
 ## Notes
-- Search dialog: **Search channels**, **Search guide (this list)**, **Rebuild index** (Back closes the dialog). An empty channel search reports how many channels are indexed and whether the index is incomplete.
+- The help line at the bottom of the main screen changes with context (categories, channels, Favorites, programme guide, moving a channel).
+- Search dialog: **Search channels**, **Search program guide (current channel list)**, **Rebuild channel search index** (Back closes the dialog). If the index file is found to be incomplete, SBWatch rebuilds it once per session and re-runs the search. An empty channel search reports how many channels are indexed and whether the index is incomplete.
 - Search index: built in the Roku cache, category by category (progress top right), refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
 - Guide data comes from Xtream `get_short_epg`, per channel, cached 5 minutes. There is no provider-wide guide search (Xtream has none, and full XMLTV is too large for a Roku).
 - Stream resolution is shown only if the stream's playlist declares it; Roku does not expose decoder resolution to apps.

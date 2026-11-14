@@ -15,8 +15,7 @@
         <Rectangle id="bg" width="1920" height="1080" color="0x0B0F14FF" />
 
         <Label id="title" text="SBWatch" translation="[60,40]" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
-        <Label id="hint" translation="[60,1005]" width="1800" color="0x8A97A6FF"
-               text="OK: select/play   *: favorite (Favorites list: move / remove) / change provider   Search: first row of categories   Replay: filter categories / full guide   Right: scroll guide panel   Watching: Up/Down channel, Left: guide, Replay: menu" />
+        <Label id="hint" translation="[60,1005]" width="1800" color="0x8A97A6FF" text="" />
 
         <LabelList id="catList" translation="[60,130]" itemSize="[520,56]" numRows="14"
                    vertFocusAnimationStyle="floatingFocus" color="0xC8D1DCFF" focusedColor="0xFFFFFFFF" />

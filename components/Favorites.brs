@@ -86,6 +86,7 @@ end sub
 sub startFavMove(fpos as Integer)
     m.favMove = { idx: fpos, startIdx: fpos, orig: loadList("favs"), busy: false }
     showStatus("Moving channel:  Up / Down to reposition,  OK to drop,  Back to cancel", 0)
+    updateHint()
 end sub
 
 ' Called from onChFocused while a move is in progress.
@@ -124,6 +125,7 @@ sub endFavMove(keep as Boolean)
     m.favMove = invalid
     m.favTimer.control = "stop"
     if fm = invalid then return
+    updateHint()
     if keep then
         showStatus("Order saved", 2)
     else

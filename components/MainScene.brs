@@ -43,6 +43,9 @@ sub init()
     favInit()
     m.global.addFields({ favIds: {}, showFavStars: true })
     refreshFavIds()
+    m.hint = m.top.findNode("hint")
+    m.top.observeField("focusedChild", "onFocusChange")
+    updateHint()
     m.devInfo = CreateObject("roDeviceInfo")
 
     m.tasks = []
@@ -354,6 +357,7 @@ sub showChannels(node as Object, emptyMsg as String)
     if m.curCat = "__fav" then showStars = false
     m.global.showFavStars = showStars
     m.chList.content = node
+    updateHint()
     n = node.getChildCount()
     if n = 0 then
         showStatus(emptyMsg, 4)
@@ -644,6 +648,7 @@ sub stopPlayback()
     hideStatus()
     m.chList.setFocus(true)
     scheduleEpg()
+    updateHint()
 end sub
 
 sub zap(delta as Integer)
@@ -1015,7 +1020,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     else if key = "replay" then
         if m.catList.isInFocusChain() then
-            openFilterDialog()
+            openSearchDialog()
             return true
         else if m.chList.isInFocusChain() then
             openGuide()
@@ -1042,3 +1047,30 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     end if
     return false
 end function
+
+' ---------------------------------------------------------------------
+' Context-sensitive help line at the bottom of the main screen
+' ---------------------------------------------------------------------
+
+sub onFocusChange()
+    updateHint()
+end sub
+
+sub updateHint()
+    if m.hint = invalid then return
+    txt = ""
+    if m.favMove <> invalid then
+        txt = "MOVING CHANNEL     Up / Down: reposition     OK: drop here     Back: cancel"
+    else if m.epgList.isInFocusChain() then
+        txt = "PROGRAMME GUIDE     Up / Down: scroll programmes     Left or Back: return to the channel list"
+    else if m.chList.isInFocusChain() then
+        if m.curCat = "__fav" then
+            txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: programme guide     Left or Back: categories"
+        else
+            txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: programme guide     Left or Back: categories"
+        end if
+    else if m.catList.isInFocusChain() then
+        txt = "CATEGORIES     OK: open / run     Right: channels     Replay: search     *: change provider     Back: exit"
+    end if
+    if txt <> "" then m.hint.text = txt
+end sub
