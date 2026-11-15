@@ -38,7 +38,7 @@
             <Label id="gTitle" translation="[60,30]" width="1200" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
             <Label id="gClock" translation="[1400,38]" width="460" horizAlign="right" font="font:MediumSystemFont" color="0x8A97A6FF" />
             <Label id="gHint" translation="[60,92]" width="1800" font="font:SmallestSystemFont" color="0x8A97A6FF"
-                   text="Left/Right: programmes   Up/Down: channels   OK: watch   Rewind/FF: page   Replay: jump to now   *: favorite   Back: close" />
+                   text="Left/Right: programs   Up/Down: channels   OK: watch   Rewind/FF: page   Replay: jump to now   *: favorite   Back: close" />
             <Group id="gHead" />
             <Group id="gRowsG" />
             <Rectangle id="gNowLine" width="3" height="704" color="0xFF4D4DFF" visible="false" />
@@ -74,6 +74,7 @@
         <Timer id="ovTimer" duration="5" repeat="false" />
         <Timer id="statusTimer" duration="3" repeat="false" />
         <Timer id="nerdTimer" duration="1" repeat="true" />
+        <Timer id="nerdHideTimer" duration="15" repeat="false" />
         <Timer id="favTimer" duration="0.25" repeat="false" />
     </children>
 </component>

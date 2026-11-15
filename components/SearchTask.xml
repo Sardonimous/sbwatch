@@ -3,6 +3,8 @@
     <interface>
         <field id="kind" type="string" />
         <field id="query" type="string" />
+        <field id="shards" type="integer" />
+        <field id="vol" type="string" />
         <field id="catMap" type="assocarray" />
         <field id="content" type="node" />
         <field id="total" type="integer" />

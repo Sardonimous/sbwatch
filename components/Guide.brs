@@ -163,7 +163,7 @@ sub closeGuide()
     updateHint()
 end sub
 
-' Segments of one row over [gBase, gBase + 12h]: programmes plus
+' Segments of one row over [gBase, gBase + 12h]: programs plus
 ' "gap" segments for missing data, so every instant belongs to a segment.
 function rowSegments(id as String) as Object
     segs = []

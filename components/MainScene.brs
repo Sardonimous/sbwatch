@@ -1,7 +1,7 @@
 ' =====================================================================
 ' SBWatch - main scene (v0.2)
 ' Xtream Codes live TV client: filterable categories, channels,
-' scrollable colour EPG panel, favorites, recents, stream "nerd" info.
+' scrollable color EPG panel, favorites, recents, stream "nerd" info.
 ' Channels are loaded per category (never all at once) so 30,000-channel
 ' providers stay within Roku memory limits.
 ' =====================================================================
@@ -28,6 +28,9 @@ sub init()
     m.ovTimer = m.top.findNode("ovTimer")
     m.statusTimer = m.top.findNode("statusTimer")
     m.nerdTimer = m.top.findNode("nerdTimer")
+    m.nerdHideTimer = m.top.findNode("nerdHideTimer")
+    m.nerdHideTimer.observeField("fire", "onNerdHide")
+    m.prevChan = invalid
 
     m.catList.observeField("itemSelected", "onCatSelected")
     m.chList.observeField("itemSelected", "onChSelected")
@@ -579,6 +582,7 @@ sub playChannel(index as Integer)
     if index < 0 or index >= c.getChildCount() then return
     item = c.getChild(index)
 
+    rememberPrev(item.id)
     m.playingIndex = index
     m.playingId = item.id
     m.triedTs = false
@@ -645,6 +649,7 @@ sub stopPlayback()
     m.ovTimer.control = "stop"
     m.nerd.visible = false
     m.nerdTimer.control = "stop"
+    m.nerdHideTimer.control = "stop"
     hideStatus()
     m.chList.setFocus(true)
     scheduleEpg()
@@ -681,11 +686,19 @@ sub toggleNerd()
     if m.nerd.visible then
         m.nerd.visible = false
         m.nerdTimer.control = "stop"
+        m.nerdHideTimer.control = "stop"
     else
         updateNerd()
         m.nerd.visible = true
         m.nerdTimer.control = "start"
+        m.nerdHideTimer.control = "stop"
+        m.nerdHideTimer.control = "start"
     end if
+end sub
+
+sub onNerdHide()
+    m.nerd.visible = false
+    m.nerdTimer.control = "stop"
 end sub
 
 sub onNerdTimer()
@@ -940,6 +953,7 @@ end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+    if not isKnownKey(key) then print "SBWatch: unhandled key name: "; key
 
     if m.guideOpen then
         if key = "back" then
@@ -955,7 +969,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             guidePage(1)
         else if key = "replay" then
             guideNow()
-        else if key = "options" then
+        else if key = "options" or key = "a" then
             item = currentFocusedItem()
             if item <> invalid then toggleFav(item.id, chanName(item), item.HDPosterUrl)
         end if
@@ -980,6 +994,10 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             showOverlay()
         else if key = "left" then
             openGuide()
+        else if key = "a" then
+            toggleFav(m.playingId, m.ovName.text, m.playingIcon)
+        else if key = "b" then
+            previousChannel()
         else if key = "options" or key = "replay" then
             showPlayMenu()
         end if
@@ -989,7 +1007,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if m.favMove <> invalid then
         if key = "back" then
             endFavMove(false)
-        else if key = "options" then
+        else if key = "options" or key = "a" then
             endFavMove(true)
         end if
         return true
@@ -1004,7 +1022,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             return true
         end if
         return false
-    else if key = "options" then
+    else if key = "options" or key = "a" then
         if m.chList.isInFocusChain() then
             item = currentFocusedItem()
             if item <> invalid then
@@ -1014,7 +1032,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                     toggleFav(item.id, chanName(item), item.HDPosterUrl)
                 end if
             end if
-        else
+        else if key = "options" then
             beginLogin()
         end if
         return true
@@ -1062,15 +1080,76 @@ sub updateHint()
     if m.favMove <> invalid then
         txt = "MOVING CHANNEL     Up / Down: reposition     OK: drop here     Back: cancel"
     else if m.epgList.isInFocusChain() then
-        txt = "PROGRAMME GUIDE     Up / Down: scroll programmes     Left or Back: return to the channel list"
+        txt = "PROGRAM GUIDE     Up / Down: scroll programs     Left or Back: return to the channel list"
     else if m.chList.isInFocusChain() then
         if m.curCat = "__fav" then
-            txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: programme guide     Left or Back: categories"
+            txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
         else
-            txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: programme guide     Left or Back: categories"
+            txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
         end if
     else if m.catList.isInFocusChain() then
         txt = "CATEGORIES     OK: open / run     Right: channels     Replay: search     *: change provider     Back: exit"
     end if
     if txt <> "" then m.hint.text = txt
 end sub
+
+' ---------------------------------------------------------------------
+' Previous channel ("B" button) and direct play by id
+' ---------------------------------------------------------------------
+
+sub rememberPrev(newId as String)
+    if m.playingId <> "" and m.playingId <> newId then
+        m.prevChan = { id: m.playingId, name: m.ovName.text, icon: m.playingIcon }
+    end if
+end sub
+
+sub previousChannel()
+    p = m.prevChan
+    if p = invalid then
+        showStatus("No previous channel yet", 2)
+        return
+    end if
+    playDirect(p.id, p.name, p.icon)
+end sub
+
+sub playDirect(id as String, name as String, icon as String)
+    rememberPrev(id)
+    m.playingIndex = -1
+    m.playingId = id
+    m.triedTs = false
+    m.ovName.text = name
+    m.ovEpg.text = ""
+    m.playingIcon = icon
+    setLogo(m.ovLogo, icon)
+
+    e = cachedEpg(id)
+    if e <> invalid then
+        m.ovEpg.text = e.ov
+    else
+        requestEpg(id)
+    end if
+
+    addRecent(id, name, icon)
+    startStream(id, "m3u8")
+    showOverlay()
+
+    ' keep the channel list selection in step when the channel is in it
+    c = m.chList.content
+    if c <> invalid then
+        for i = 0 to c.getChildCount() - 1
+            if c.getChild(i).id = id then
+                m.playingIndex = i
+                m.chList.jumpToItem = i
+                exit for
+            end if
+        end for
+    end if
+end sub
+
+function isKnownKey(key as String) as Boolean
+    known = ["back", "up", "down", "left", "right", "OK", "options", "replay", "rewind", "fastforward", "play", "info", "a", "b"]
+    for each k in known
+        if key = k then return true
+    end for
+    return false
+end function

@@ -11,9 +11,9 @@ SBWatch is only a player. You supply your own Xtream provider; no content or cre
 - Categories with a name filter; channels load per category, so 30,000-channel providers stay within Roku memory limits
 - A gold star marks channels that are in your Favorites (on every list except Favorites itself, and in the guide)
 - Channel logos next to channel names (list, guide, now/next panel, playback banner)
-- Now/next panel with colour-coded, scrollable programme cards
+- Now/next panel with color-coded, scrollable program cards
 - Full time-grid guide (fetched lazily for the visible rows only)
-- Search: whole-provider channel search (on-device name index) and programme-title search in the open channel list
+- Search: whole-provider channel search (on-device name index) and program-title search in the open channel list
 - Favorites and recently watched
 - HLS playback with automatic MPEG-TS fallback; stream "nerd" info panel
 
@@ -42,19 +42,23 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Channel list | `*` | add / remove favorite |
 | Favorites list | `*` | menu: Move (Up/Down, OK to drop, Back to cancel), Move to top, Remove |
 | Channel list | Replay | open the full guide |
-| Guide | Left/Right, Up/Down | programme / channel; OK watch; Rewind/FF page; Replay = now; `*` favorite; Back close |
+| Guide | Left/Right, Up/Down | program / channel; OK watch; Rewind/FF page; Replay = now; `*` favorite; Back close |
 | Watching | Up / Down | previous / next channel |
 | Watching | Left | open the guide |
 | Watching (started from the guide) | Back | returns to the guide |
+| Watching | A | add / remove the playing channel as a favorite |
+| Watching | B | jump back to the previous channel (press again to flip back) |
 | Watching | Replay | playback menu (guide, stream info, favorite, force HLS/TS) |
 | Watching | `*` | the Roku system Options menu (captions, audio) |
 
 Closed captions: turn them on in the Roku Options menu (`*` while watching) or Settings > Accessibility > Captions. They work when the stream carries CEA-608/708 captions or HLS WebVTT subtitles.
 
 ## Notes
-- The help line at the bottom of the main screen changes with context (categories, channels, Favorites, programme guide, moving a channel).
+- **A / B buttons:** on remotes that have them, A toggles the favorite star (it also works during playback, where the system captures `*`) and B returns to the previous channel. Roku does not document how A/B reach apps, so if they do nothing on your remote, press them while watching the debug console (`telnet ROKU_IP 8085`): SBWatch prints the key name of any key it does not recognize.
+- The stream info panel hides itself after 15 seconds.
+- The help line at the bottom of the main screen changes with context (categories, channels, Favorites, program guide, moving a channel).
 - Search dialog: **Search channels**, **Search program guide (current channel list)**, **Rebuild channel search index** (Back closes the dialog). If the index file is found to be incomplete, SBWatch rebuilds it once per session and re-runs the search. An empty channel search reports how many channels are indexed and whether the index is incomplete.
-- Search index: built in the Roku cache, category by category (progress top right), refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
+- Search index: fetched category by category (progress top right) and stored as small verified files in the Roku's cache (or temporary storage if the cache is unusable); old index files are wiped before each rebuild. Refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
 - Guide data comes from Xtream `get_short_epg`, per channel, cached 5 minutes. There is no provider-wide guide search (Xtream has none, and full XMLTV is too large for a Roku).
 - Stream resolution is shown only if the stream's playlist declares it; Roku does not expose decoder resolution to apps.
 - The category filter is remembered across restarts (clear it from the filter dialog).

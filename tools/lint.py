@@ -16,7 +16,7 @@ for f in sorted(glob.glob('components/*.brs')+glob.glob('source/*.brs')):
             print("RESERVED WORD",f,n,m_.group(1),"|",l.strip()); bad=True
 defs={d.lower() for d in re.findall(r'^(?:sub|function)\s+(\w+)',src,re.M|re.I)}
 calls=set(re.findall(r'(?<![\.\w])([a-zA-Z_]\w*)\(',src))
-bi={'createobject','len','left','right','mid','int','val','str','lcase','asc','chr','instr','parsejson','formatjson','type','wait','sleep','readasciifile','writeasciifile','if','for','while','function','sub','and','or','not','each','track'}
+bi={'createobject','len','left','right','mid','int','val','str','lcase','asc','chr','instr','parsejson','formatjson','type','wait','sleep','listdir','deletefile','readasciifile','writeasciifile','if','for','while','function','sub','and','or','not','each','track'}
 u=sorted(c for c in calls if c.lower() not in defs and c.lower() not in bi)
 if u: print("UNDEFINED",u); bad=True
 print("LINT FAILED" if bad else "lint ok")

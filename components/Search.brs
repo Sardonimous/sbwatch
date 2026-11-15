@@ -3,7 +3,7 @@
 '  - Channel search: whole provider, using an on-device name index that
 '    IndexTask builds once (category by category) and refreshes every
 '    few days. "kind" is generic so VOD / Series can reuse all of it.
-'  - Guide search: programme titles for the channels of the list that is
+'  - Guide search: program titles for the channels of the list that is
 '    currently open (guide data is fetched for those channels first).
 ' Results are shown in the normal channel list, so playing, favorites,
 ' the guide and the now/next panel all work on them.
@@ -40,7 +40,8 @@ function indexState(kind as String) as String
     j = readIndexMeta(kind)
     if j = invalid then return "none"
     if toS(j.key) <> m.server + "|" + m.user then return "none"
-    if Int(Val(toS(j.ver))) < 2 then return "stale"
+    if Int(Val(toS(j.ver))) < 3 then return "none"
+    if Int(Val(toS(j.shards))) < 1 then return "none"
     age = nowSecs() - Int(Val(toS(j.ts)))
     if Int(Val(toS(j.fails))) > 0 and age > 600 and not m.partialRetried then return "stale"
     if age > 259200 then return "stale"
@@ -75,6 +76,7 @@ sub startIndexBuild()
     t.observeField("state", "onIdxState")
     m.idxTask = t
     m.idxTotal = ids.Count()
+    regWrite("idxmeta_live", "")
     m.idxBuilding = true
     m.partialRetried = true
     m.idxLabel.text = "Indexing channels 0/" + m.idxTotal.ToStr()
@@ -106,7 +108,7 @@ sub onIdxState(event as Object)
         return
     end if
 
-    regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), count: res.count, fails: res.fails, ver: 2, key: t.server + "|" + t.user }))
+    regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), count: res.count, fails: res.fails, ver: 3, shards: res.shards, vol: res.vol, key: t.server + "|" + t.user }))
 
     q = m.pendingQuery
     m.pendingQuery = ""
@@ -187,9 +189,18 @@ sub startChannelSearch(q as String)
 end sub
 
 sub runSearchTask(q as String)
+    meta = readIndexMeta("live")
+    if meta = invalid then
+        m.pendingQuery = q
+        startIndexBuild()
+        showStatus("Building search index - your search will run when it is ready", 0)
+        return
+    end if
     showStatus("Searching ...", 0)
     t = CreateObject("roSGNode", "SearchTask")
     t.kind = "live"
+    t.shards = Int(Val(toS(meta.shards)))
+    t.vol = toS(meta.vol)
     t.query = q
     t.catMap = m.catMap
     t.observeField("state", "onSearchDone")
@@ -344,7 +355,7 @@ sub finishEpgSearch()
 
     node = CreateObject("roSGNode", "ContentNode")
     node.update({ children: items }, true)
-    deliverResults(node, items.Count().ToStr() + " programmes match '" + es.q + "'", "No programme titles match '" + es.q + "' in this list's guide data")
+    deliverResults(node, items.Count().ToStr() + " programs match '" + es.q + "'", "No program titles match '" + es.q + "' in this list's guide data")
 end sub
 
 ' ---------------- showing results ----------------
