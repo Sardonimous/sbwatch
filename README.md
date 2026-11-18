@@ -46,15 +46,15 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Watching | Up / Down | previous / next channel |
 | Watching | Left | open the guide |
 | Watching (started from the guide) | Back | returns to the guide |
-| Watching | A | add / remove the playing channel as a favorite |
+| Watching | A | add / remove the playing channel as a favorite (the remote reports it as the key name `A`) |
 | Watching | B | jump back to the previous channel (press again to flip back) |
 | Watching | Replay | playback menu (guide, stream info, favorite, force HLS/TS) |
 | Watching | `*` | the Roku system Options menu (captions, audio) |
 
-Closed captions: turn them on in the Roku Options menu (`*` while watching) or Settings > Accessibility > Captions. They work when the stream carries CEA-608/708 captions or HLS WebVTT subtitles.
+Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Turn them on from the Replay menu (**Captions**: Off -> CC1 -> CC2 -> CC3 -> CC4 -> Off) or from Roku's Settings > Accessibility > Captions. DVB / teletext subtitles are not supported by the Roku player.
 
 ## Notes
-- **A / B buttons:** on remotes that have them, A toggles the favorite star (it also works during playback, where the system captures `*`) and B returns to the previous channel. Roku does not document how A/B reach apps, so if they do nothing on your remote, press them while watching the debug console (`telnet ROKU_IP 8085`): SBWatch prints the key name of any key it does not recognize.
+- **A / B buttons:** on remotes that have them (Roku reports the key names as `A` and `B`), A toggles the favorite star (it also works during playback, where the system captures `*`) and B returns to the previous channel. Roku does not document how A/B reach apps, if they ever stop working, press them while watching the debug console (`telnet ROKU_IP 8085`): SBWatch prints the key name of any key it does not recognize.
 - The stream info panel hides itself after 15 seconds.
 - The help line at the bottom of the main screen changes with context (categories, channels, Favorites, program guide, moving a channel).
 - Search dialog: **Search channels**, **Search program guide (current channel list)**, **Rebuild channel search index** (Back closes the dialog). If the index file is found to be incomplete, SBWatch rebuilds it once per session and re-runs the search. An empty channel search reports how many channels are indexed and whether the index is incomplete.

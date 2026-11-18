@@ -31,6 +31,7 @@ sub init()
     m.nerdHideTimer = m.top.findNode("nerdHideTimer")
     m.nerdHideTimer.observeField("fire", "onNerdHide")
     m.prevChan = invalid
+    m.capChan = 1
 
     m.catList.observeField("itemSelected", "onCatSelected")
     m.chList.observeField("itemSelected", "onChSelected")
@@ -619,6 +620,14 @@ sub startStream(id as String, ext as String)
         c.streamFormat = "ts"
     end if
     c.live = true
+    ' Roku shows in-band EIA-608 captions only when the channel is declared
+    ' (a decoder such as ExoPlayer finds them by itself): CC1..CC4
+    tracks = []
+    for n = 1 to 4
+        tracks.push({ Language: "eng", TrackName: "eia608/" + n.ToStr(), Description: "CC" + n.ToStr() })
+    end for
+    c.SubtitleTracks = tracks
+    c.SubtitleConfig = { TrackName: "eia608/" + m.capChan.ToStr() }
     m.video.content = c
     m.video.visible = true
     m.video.control = "play"
@@ -739,6 +748,7 @@ sub updateNerd()
         res = "n/a"
         if w <> "" and w <> "0" then res = w + " x " + h
         lines.push("Resolution: " + res + "     Segment bitrate: " + fmtBps(ss.segBitrateBps) + "     Seg #" + toS(ss.segSequence))
+        if ss.DoesExist("latency") then lines.push("Latency (reported by the player; Roku does not document its units): " + toS(ss.latency))
     end if
 
     si = fldOf(v, "streamInfo")
@@ -764,7 +774,7 @@ sub updateNerd()
     end if
     capMode = toS(fldOf(v, "globalCaptionMode"))
     if capMode = "" then capMode = "n/a"
-    lines.push("Subtitles: " + subTxt + "     Roku caption mode: " + capMode)
+    lines.push("Subtitles: " + subTxt + "     Roku caption mode: " + capMode + "     Requested: eia608/" + m.capChan.ToStr())
     lines.push("Display mode: " + m.devInfo.GetVideoMode())
     lines.push("")
     lines.push("URL: " + maskUrl(url))
@@ -798,7 +808,16 @@ sub showPlayMenu()
     dlg = CreateObject("roSGNode", "StandardMessageDialog")
     dlg.title = m.ovName.text
     dlg.message = ["Playback options"]
-    dlg.buttons = ["Open channel guide", nerdLbl, favLbl, swLbl, "Close"]
+    capMode = toS(fldOf(m.video, "globalCaptionMode"))
+    capLbl = "Captions: off  (select to turn on, CC" + m.capChan.ToStr() + ")"
+    if capMode <> "" and capMode <> "Off" then
+        if m.capChan < 4 then
+            capLbl = "Captions: CC" + m.capChan.ToStr() + "  (select for CC" + (m.capChan + 1).ToStr() + ")"
+        else
+            capLbl = "Captions: CC4  (select to turn off)"
+        end if
+    end if
+    dlg.buttons = ["Open channel guide", nerdLbl, favLbl, swLbl, capLbl]
     dlg.observeField("buttonSelected", "onPlayMenu")
     m.menuDlg = dlg
     m.top.dialog = dlg
@@ -820,6 +839,34 @@ sub onPlayMenu(event as Object)
         else
             startStream(m.playingId, "m3u8")
         end if
+    else if idx = 4 then
+        cycleCaptions()
+    end if
+end sub
+
+' Off -> CC1 -> CC2 -> CC3 -> CC4 -> Off. Also sets Roku's caption mode,
+' as Roku asks apps to do when the viewer switches captions on or off.
+sub cycleCaptions()
+    mode = toS(fldOf(m.video, "globalCaptionMode"))
+    if mode = "" or mode = "Off" then
+        m.capChan = 1
+        setCaptions(true)
+    else if m.capChan < 4 then
+        m.capChan = m.capChan + 1
+        setCaptions(true)
+    else
+        setCaptions(false)
+    end if
+end sub
+
+sub setCaptions(on as Boolean)
+    if on then
+        if m.video.hasField("globalCaptionMode") then m.video.globalCaptionMode = "On"
+        if m.video.hasField("subtitleTrack") then m.video.subtitleTrack = "eia608/" + m.capChan.ToStr()
+        showStatus("Closed captions on: CC" + m.capChan.ToStr() + "  (no text appears if the stream carries no captions on this channel)", 5)
+    else
+        if m.video.hasField("globalCaptionMode") then m.video.globalCaptionMode = "Off"
+        showStatus("Closed captions off", 3)
     end if
 end sub
 
@@ -953,6 +1000,8 @@ end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+    lk = LCase(key)
+    if lk = "a" or lk = "b" then key = lk
     if not isKnownKey(key) then print "SBWatch: unhandled key name: "; key
 
     if m.guideOpen then
