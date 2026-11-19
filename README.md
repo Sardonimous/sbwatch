@@ -7,6 +7,7 @@ An Xtream Codes live-TV client for Roku (BrightScript / SceneGraph), built for p
 SBWatch is only a player. You supply your own Xtream provider; no content or credentials are included in this repository.
 
 ## Features
+- **Movies and Series with resume.** Switch between Live TV, Movies and Series from the first row of the category list ("Browse: ..."). Movies open a detail screen (poster, plot, rating, cast) with Play / Resume / Start over; Series open into seasons and episodes, and the next episode plays automatically. Progress is saved every 15 seconds and when you stop, a "Continue Watching" list shows what you left part-way, and titles with saved progress are marked "(resume 34:10)". Search, the category filter and the index work in each mode.
 - Xtream login (server URL, username, password), saved on the Roku
 - Categories with a name filter; channels load per category, so 30,000-channel providers stay within Roku memory limits
 - A gold star marks channels that are in your Favorites (on every list except Favorites itself, and in the guide)
@@ -47,14 +48,20 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Watching | Left | open the guide |
 | Watching (started from the guide) | Back | returns to the guide |
 | Watching | A | add / remove the playing channel as a favorite (the remote reports it as the key name `A`) |
-| Watching | B | jump back to the previous channel (press again to flip back) |
+| Watching | B | turn closed captions on / off |
 | Watching | Replay | playback menu (guide, stream info, favorite, force HLS/TS) |
 | Watching | `*` | the Roku system Options menu (captions, audio) |
 
-Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Turn them on from the Replay menu (**Captions**: Off -> CC1 -> CC2 -> CC3 -> CC4 -> Off) or from Roku's Settings > Accessibility > Captions. DVB / teletext subtitles are not supported by the Roku player.
+Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Press **B** to turn captions on or off; the Replay menu item **Caption channel** cycles CC1 -> CC2 -> CC3 -> CC4. (You can also use Roku's Settings > Accessibility > Captions.) DVB / teletext subtitles are not supported by the Roku player.
+
+## Movies and Series notes
+- Resume points are stored in the Roku registry (newest 40, about 9 KB) together with Favorites (about 100 channels) and Recently Watched (15), because the registry is limited to 32 KB. A resume point is saved after 30 seconds of viewing and cleared when you finish (95% watched).
+- Playback uses the Roku player's own controls: OK pause / play, Left / Right and Rewind / Fast-forward to seek, `*` for audio and subtitle choices, Back to stop. B turns captions on / off.
+- Favorites, Recently Watched and the program guide are for Live TV only. Resume data is cleared if you change provider.
 
 ## Notes
-- **A / B buttons:** on remotes that have them (Roku reports the key names as `A` and `B`), A toggles the favorite star (it also works during playback, where the system captures `*`) and B returns to the previous channel. Roku does not document how A/B reach apps, if they ever stop working, press them while watching the debug console (`telnet ROKU_IP 8085`): SBWatch prints the key name of any key it does not recognize.
+- Stream info: the player's "latency" field returns 2147483647 (the largest 32-bit number) on these streams, which is a placeholder for "not reported", so the panel says so.
+- **A / B buttons:** on remotes that have them (Roku reports the key names as `A` and `B`), A toggles the favorite star (it also works during playback, where the system captures `*`) and B turns closed captions on or off. Roku does not document how A/B reach apps; if they ever stop working, press them while watching the debug console (`telnet ROKU_IP 8085`): SBWatch prints the key name of any key it does not recognize.
 - The stream info panel hides itself after 15 seconds.
 - The help line at the bottom of the main screen changes with context (categories, channels, Favorites, program guide, moving a channel).
 - Search dialog: **Search channels**, **Search program guide (current channel list)**, **Rebuild channel search index** (Back closes the dialog). If the index file is found to be incomplete, SBWatch rebuilds it once per session and re-runs the search. An empty channel search reports how many channels are indexed and whether the index is incomplete.

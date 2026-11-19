@@ -172,3 +172,61 @@ sub setLogo(p as Object, url as Dynamic)
         if p.uri <> u then p.uri = u
     end if
 end sub
+
+function fmtDur(secs as Integer) as String
+    if secs < 0 then secs = 0
+    h = secs \ 3600
+    mm = (secs mod 3600) \ 60
+    ss = secs mod 60
+    if h > 0 then return h.ToStr() + ":" + Right("0" + mm.ToStr(), 2) + ":" + Right("0" + ss.ToStr(), 2)
+    return mm.ToStr() + ":" + Right("0" + ss.ToStr(), 2)
+end function
+
+function two(n as Integer) as String
+    return Right("0" + n.ToStr(), 2)
+end function
+
+' first non-empty string among several possible keys of an AA
+function firstS(aa as Object, keys as Object) as String
+    if type(aa) <> "roAssociativeArray" then return ""
+    for each k in keys
+        v = toS(aa[k])
+        if v <> "" then return v
+    end for
+    return ""
+end function
+
+' string value of a content-node field ("" if the field does not exist)
+function nodeStr(node as Object, name as String) as String
+    if node.hasField(name) then return toS(node.getField(name))
+    return ""
+end function
+
+' insertion sort of an array of AAs by their "num" key
+sub sortByNum(arr as Object)
+    for i = 1 to arr.Count() - 1
+        cur = arr[i]
+        j = i - 1
+        moving = true
+        while moving
+            if j < 0 then
+                moving = false
+            else if arr[j].num > cur.num then
+                arr[j + 1] = arr[j]
+                j = j - 1
+            else
+                moving = false
+            end if
+        end while
+        arr[j + 1] = cur
+    end for
+end sub
+
+function vodFormat(ext as String) as String
+    e = LCase(ext)
+    if e = "mkv" then return "mkv"
+    if e = "mp4" or e = "m4v" or e = "mov" then return "mp4"
+    if e = "ts" then return "ts"
+    if e = "m3u8" then return "hls"
+    return ""
+end function

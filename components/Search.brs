@@ -23,6 +23,9 @@ sub searchInit()
     m.catMap = {}
     m.autoRebuilt = false
     m.partialRetried = false
+    m.searchActs = []
+    m.idxKind = "live"
+    m.idxNoun = "channels"
 end sub
 
 ' ---------------- index state ----------------
@@ -49,12 +52,14 @@ function indexState(kind as String) as String
 end function
 
 sub maybeBuildIndex()
-    if indexState("live") <> "ok" then startIndexBuild()
+    if m.mode <> "live" then return
+    if indexState("live") <> "ok" then startIndexBuild("live")
 end sub
 
-sub startIndexBuild()
+sub startIndexBuild(kind as String)
+    if kind <> m.mode then return
     if m.idxBuilding then
-        showStatus("Search index is already being built", 3)
+        showStatus("A search index is already being built", 3)
         return
     end if
     if m.allCats.Count() = 0 then return
@@ -67,7 +72,7 @@ sub startIndexBuild()
     end for
 
     t = CreateObject("roSGNode", "IndexTask")
-    t.kind = "live"
+    t.kind = kind
     t.server = m.server
     t.user = m.user
     t.pass = m.pass
@@ -75,18 +80,20 @@ sub startIndexBuild()
     t.observeField("progress", "onIdxProgress")
     t.observeField("state", "onIdxState")
     m.idxTask = t
+    m.idxKind = kind
+    m.idxNoun = kindNoun(kind)
     m.idxTotal = ids.Count()
-    regWrite("idxmeta_live", "")
+    regWrite("idxmeta_" + kind, "")
     m.idxBuilding = true
     m.partialRetried = true
-    m.idxLabel.text = "Indexing channels 0/" + m.idxTotal.ToStr()
+    m.idxLabel.text = "Indexing " + m.idxNoun + " 0/" + m.idxTotal.ToStr()
     m.idxLabel.visible = true
     t.control = "RUN"
 end sub
 
 sub onIdxProgress(event as Object)
     if not m.idxBuilding then return
-    m.idxLabel.text = "Indexing channels " + event.getData().ToStr() + "/" + m.idxTotal.ToStr()
+    m.idxLabel.text = "Indexing " + m.idxNoun + " " + event.getData().ToStr() + "/" + m.idxTotal.ToStr()
 end sub
 
 sub onIdxState(event as Object)
@@ -108,16 +115,16 @@ sub onIdxState(event as Object)
         return
     end if
 
-    regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), count: res.count, fails: res.fails, ver: 3, shards: res.shards, vol: res.vol, key: t.server + "|" + t.user }))
+    regWrite("idxmeta_" + t.kind, FormatJson({ ts: nowSecs(), count: res.count, fails: res.fails, ver: 3, shards: res.shards, vol: res.vol, key: t.server + "|" + t.user }))
 
     q = m.pendingQuery
     m.pendingQuery = ""
-    if q <> "" then
+    if q <> "" and t.kind = m.mode then
         runSearchTask(q)
     else
         note = ""
         if res.fails > 0 then note = "  (" + res.fails.ToStr() + " categories could not be read)"
-        showStatus("Search index ready: " + res.count.ToStr() + " channels" + note, 5)
+        showStatus("Search index ready: " + res.count.ToStr() + " " + kindNoun(t.kind) + note, 5)
     end if
 end sub
 
@@ -136,8 +143,16 @@ end sub
 sub openSearchDialog()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Search"
+    if m.mode <> "live" then dlg.title = "Search " + modeName()
     dlg.text = m.lastQuery
-    dlg.buttons = ["Search channels", "Search program guide (current channel list)", "Rebuild channel search index"]
+    if m.mode = "live" then
+        dlg.buttons = ["Search channels", "Search program guide (current channel list)", "Rebuild channel search index"]
+        m.searchActs = ["chan", "epg", "rebuild"]
+    else
+        noun = kindNoun(m.mode)
+        dlg.buttons = ["Search " + noun, "Rebuild " + noun + " search index"]
+        m.searchActs = ["chan", "rebuild"]
+    end if
     dlg.observeField("buttonSelected", "onSearchButton")
     m.sdlg = dlg
     m.top.dialog = dlg
@@ -148,9 +163,11 @@ sub onSearchButton(event as Object)
     txt = m.sdlg.text
     if txt = invalid then txt = ""
     m.sdlg.close = true
+    if idx < 0 or idx >= m.searchActs.Count() then return
+    act = m.searchActs[idx]
 
-    if idx = 2 then
-        startIndexBuild()
+    if act = "rebuild" then
+        startIndexBuild(m.mode)
         return
     end if
 
@@ -161,7 +178,7 @@ sub onSearchButton(event as Object)
         return
     end if
 
-    if idx = 0 then
+    if act = "chan" then
         startChannelSearch(q)
     else
         startEpgSearch(q)
@@ -172,33 +189,38 @@ end sub
 
 sub startChannelSearch(q as String)
     if m.idxBuilding then
+        if m.idxKind <> m.mode then
+            showStatus("Another search index is being built - try again in a moment", 4)
+            return
+        end if
         m.pendingQuery = q
         showStatus("Search index is still being built - your search will run when it is ready", 0)
         return
     end if
 
-    st = indexState("live")
+    st = indexState(m.mode)
     if st = "none" then
         m.pendingQuery = q
-        startIndexBuild()
+        startIndexBuild(m.mode)
         showStatus("Building search index (first time only) - your search will run when it is ready", 0)
         return
     end if
-    if st = "stale" then startIndexBuild()
+    if st = "stale" then startIndexBuild(m.mode)
     runSearchTask(q)
 end sub
 
 sub runSearchTask(q as String)
-    meta = readIndexMeta("live")
+    kind = m.mode
+    meta = readIndexMeta(kind)
     if meta = invalid then
         m.pendingQuery = q
-        startIndexBuild()
+        startIndexBuild(kind)
         showStatus("Building search index - your search will run when it is ready", 0)
         return
     end if
     showStatus("Searching ...", 0)
     t = CreateObject("roSGNode", "SearchTask")
-    t.kind = "live"
+    t.kind = kind
     t.shards = Int(Val(toS(meta.shards)))
     t.vol = toS(meta.vol)
     t.query = q
@@ -212,11 +234,13 @@ sub onSearchDone(event as Object)
     t = event.getRoSGNode()
     if t.state <> "stop" then return
     q = t.query
+    kind = t.kind
+    if kind <> m.mode then return
 
     if t.errorMsg <> "" then
         if t.errorMsg = "index missing" then
             m.pendingQuery = q
-            startIndexBuild()
+            startIndexBuild(kind)
             showStatus("Rebuilding search index - your search will run when it is ready", 0)
         else
             showStatus("Search failed: " + t.errorMsg, 5)
@@ -227,25 +251,26 @@ sub onSearchDone(event as Object)
     ' Self-heal: an index file with fewer entries than the build recorded is
     ' truncated; rebuild it once per session and re-run the search.
     if not m.autoRebuilt and t.indexed > 0 then
-        meta = readIndexMeta("live")
+        meta = readIndexMeta(kind)
         if meta <> invalid then
             expected = Int(Val(toS(meta.count)))
             if expected > 0 and t.indexed * 100 < expected * 99 then
                 m.autoRebuilt = true
                 m.pendingQuery = q
-                startIndexBuild()
+                startIndexBuild(kind)
                 showStatus("Search index was incomplete - rebuilding; your search will run when it is ready", 0)
                 return
             end if
         end if
     end if
 
+    noun = kindNoun(kind)
     node = t.content
     shown = node.getChildCount()
-    label = t.total.ToStr() + " channels match '" + q + "'"
-    if t.total = 0 then label = zeroNote(q, t.indexed)
-    if t.total > shown then label = "Showing " + shown.ToStr() + " of " + t.total.ToStr() + " channels matching '" + q + "' - refine your search"
-    deliverResults(node, label, "No channels match '" + q + "'")
+    label = t.total.ToStr() + " " + noun + " match '" + q + "'"
+    if t.total = 0 then label = zeroNote(q, t.indexed, kind)
+    if t.total > shown then label = "Showing " + shown.ToStr() + " of " + t.total.ToStr() + " " + noun + " matching '" + q + "' - refine your search"
+    deliverResults(node, label, "No " + noun + " match '" + q + "'")
 end sub
 
 ' ---------------- guide (EPG) search ----------------
@@ -361,12 +386,21 @@ end sub
 ' ---------------- showing results ----------------
 
 sub deliverResults(node as Object, label as String, emptyMsg as String)
-    if m.video.visible or m.guideOpen then
+    if m.video.visible or m.guideOpen or m.detailOpen then
         m.pendingResults = { node: node, label: label, emptyMsg: emptyMsg }
         showStatus(label + "  (close the player / guide to view)", 6)
         return
     end if
     m.curCat = "__search"
+    m.navStack = []
+    if m.mode = "vod" then
+        m.listKind = "movies"
+        decorateResume(node, "m")
+    else if m.mode = "series" then
+        m.listKind = "series"
+    else
+        m.listKind = "channels"
+    end if
     showChannels(node, emptyMsg)
     showStatus(label, 6)
 end sub
@@ -380,9 +414,9 @@ sub showPendingResults()
 end sub
 
 ' Explains an empty result: how big the index is and whether it is incomplete.
-function zeroNote(q as String, indexed as Integer) as String
-    s = "0 of " + indexed.ToStr() + " indexed channels match '" + q + "'"
-    j = readIndexMeta("live")
+function zeroNote(q as String, indexed as Integer, kind as String) as String
+    s = "0 of " + indexed.ToStr() + " indexed " + kindNoun(kind) + " match '" + q + "'"
+    j = readIndexMeta(kind)
     if j <> invalid then
         expected = Int(Val(toS(j.count)))
         fails = Int(Val(toS(j.fails)))

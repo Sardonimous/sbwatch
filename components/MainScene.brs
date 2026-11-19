@@ -44,6 +44,9 @@ sub init()
 
     guideInit()
     searchInit()
+    vodInit()
+    m.catDefaultIdx = 3
+    m.catFirstIdx = 4
     favInit()
     m.global.addFields({ favIds: {}, showFavStars: true })
     refreshFavIds()
@@ -158,6 +161,7 @@ sub onKbButton(event as Object)
         regWrite("server", m.wiz.server)
         regWrite("user", m.wiz.user)
         regWrite("pass", m.wiz.pass)
+        if m.server <> m.wiz.server or m.user <> m.wiz.user then regWrite("resume", "")
         m.server = m.wiz.server
         m.user = m.wiz.user
         m.pass = m.wiz.pass
@@ -194,7 +198,7 @@ sub onAuth(event as Object)
         return
     end if
     showStatus("Loading categories ...", 0)
-    runTask("categories", apiUrl("get_live_categories", ""), "", "onCategories")
+    runTask("categories", apiUrl(categoriesAction(), ""), "", "onCategories")
 end sub
 
 sub onCategories(event as Object)
@@ -212,7 +216,7 @@ sub onCategories(event as Object)
         ch = root.getChild(i)
         m.allCats.push({ id: ch.id, title: ch.title })
     end for
-    m.catFilter = regRead("catfilter")
+    m.catFilter = regRead(filterKey())
     m.catMap = {}
     for each cc in m.allCats
         m.catMap[cc.id] = cc.title
@@ -220,9 +224,9 @@ sub onCategories(event as Object)
     cnt = rebuildCats()
     m.chList.content = invalid
     if m.catFilter <> "" and cnt > 0 then
-        m.catList.jumpToItem = 4
+        m.catList.jumpToItem = m.catFirstIdx
     else
-        m.catList.jumpToItem = 2
+        m.catList.jumpToItem = m.catDefaultIdx
     end if
     m.catList.setFocus(true)
     if m.catFilter <> "" then
@@ -241,14 +245,21 @@ end sub
 
 function rebuildCats() as Integer
     items = []
+    items.push({ id: "__mode", title: "Browse: " + modeName() + "   (OK to change)" })
     items.push({ id: "__search", title: "Search ..." })
     if m.catFilter = "" then
         items.push({ id: "__filter", title: "Filter categories ..." })
     else
         items.push({ id: "__filter", title: "Filter: " + m.catFilter + "   (OK to edit / clear)" })
     end if
-    items.push({ id: "__fav", title: "Favorites" })
-    items.push({ id: "__rec", title: "Recently Watched" })
+    if m.mode = "live" then
+        items.push({ id: "__fav", title: "Favorites" })
+        items.push({ id: "__rec", title: "Recently Watched" })
+    else
+        items.push({ id: "__cont", title: "Continue Watching" })
+    end if
+    m.catDefaultIdx = 3
+    m.catFirstIdx = items.Count()
 
     words = []
     if m.catFilter <> "" then
@@ -301,12 +312,12 @@ sub onFilterButton(event as Object)
         m.catFilter = LCase(txt.Trim())
     end if
 
-    regWrite("catfilter", m.catFilter)
+    regWrite(filterKey(), m.catFilter)
     cnt = rebuildCats()
     if cnt > 0 then
-        m.catList.jumpToItem = 4
+        m.catList.jumpToItem = m.catFirstIdx
     else
-        m.catList.jumpToItem = 1
+        m.catList.jumpToItem = 2
     end if
     m.catList.setFocus(true)
     if m.catFilter = "" then
@@ -333,8 +344,18 @@ sub onCatSelected(event as Object)
         openSearchDialog()
         return
     end if
+    if cat.id = "__mode" then
+        openModeMenu()
+        return
+    end if
 
     m.curCat = cat.id
+    m.navStack = []
+    if m.mode <> "live" then
+        vodCatSelected(cat)
+        return
+    end if
+    m.listKind = "channels"
     if cat.id = "__fav" then
         showChannels(nodeFromList(loadList("favs")), "No favorites yet. Press * on a channel to add one.")
     else if cat.id = "__rec" then
@@ -350,15 +371,17 @@ sub onStreams(event as Object)
     if t.state <> "stop" then return
     if t.param <> m.curCat then return
     if t.errorMsg <> "" then
-        showStatus("Could not load channels: " + t.errorMsg, 0)
+        showStatus("Could not load the list: " + t.errorMsg, 0)
         return
     end if
-    showChannels(t.content, "No channels in this category.")
+    node = t.content
+    if m.listKind = "movies" then decorateResume(node, "m")
+    showChannels(node, "Nothing in this category.")
 end sub
 
 sub showChannels(node as Object, emptyMsg as String)
-    showStars = true
-    if m.curCat = "__fav" then showStars = false
+    showStars = false
+    if m.mode = "live" and m.curCat <> "__fav" then showStars = true
     m.global.showFavStars = showStars
     m.chList.content = node
     updateHint()
@@ -370,7 +393,7 @@ sub showChannels(node as Object, emptyMsg as String)
     end if
     m.chList.jumpToItem = 0
     m.chList.setFocus(true)
-    showStatus(n.ToStr() + " channels", 3)
+    showStatus(n.ToStr() + " " + listNoun(), 3)
     scheduleEpg()
 end sub
 
@@ -413,6 +436,10 @@ sub onChSelected(event as Object)
         endFavMove(true)
         return
     end if
+    if m.mode <> "live" then
+        vodSelected(event.getData())
+        return
+    end if
     if m.video.visible then
         showOverlay()
         return
@@ -436,6 +463,12 @@ sub onEpgTimer()
     m.focusedId = item.id
     m.chName.text = chanName(item)
     setLogo(m.chLogo, item.HDPosterUrl)
+    if m.mode <> "live" then
+        updateVodPanel(item)
+        return
+    end if
+    m.vodPoster.visible = false
+    m.vodInfo.visible = false
     m.epgWanted = {}
     m.epgWanted[item.id] = true
     if m.playingId <> "" then m.epgWanted[m.playingId] = true
@@ -634,6 +667,10 @@ sub startStream(id as String, ext as String)
 end sub
 
 sub onVideoState()
+    if m.vodPlaying then
+        onVodState()
+        return
+    end if
     st = m.video.state
     if st = "buffering" then
         showStatus("Buffering ...", 0)
@@ -652,6 +689,12 @@ sub onVideoState()
 end sub
 
 sub stopPlayback()
+    wasVod = m.vodPlaying
+    if wasVod then
+        saveVodProgress()
+        m.vodPlaying = false
+        m.resumeTimer.control = "stop"
+    end if
     m.video.control = "stop"
     m.video.visible = false
     m.overlay.visible = false
@@ -663,6 +706,7 @@ sub stopPlayback()
     m.chList.setFocus(true)
     scheduleEpg()
     updateHint()
+    if wasVod then refreshResumeLabels()
 end sub
 
 sub zap(delta as Integer)
@@ -748,7 +792,14 @@ sub updateNerd()
         res = "n/a"
         if w <> "" and w <> "0" then res = w + " x " + h
         lines.push("Resolution: " + res + "     Segment bitrate: " + fmtBps(ss.segBitrateBps) + "     Seg #" + toS(ss.segSequence))
-        if ss.DoesExist("latency") then lines.push("Latency (reported by the player; Roku does not document its units): " + toS(ss.latency))
+        if ss.DoesExist("latency") then
+            lat = toS(ss.latency)
+            if lat = "2147483647" then
+                lines.push("Latency: not reported  (the player returned 2147483647, the largest 32-bit number, as an 'unknown' placeholder)")
+            else
+                lines.push("Latency (reported by the player; Roku does not document its units): " + lat)
+            end if
+        end if
     end if
 
     si = fldOf(v, "streamInfo")
@@ -808,15 +859,9 @@ sub showPlayMenu()
     dlg = CreateObject("roSGNode", "StandardMessageDialog")
     dlg.title = m.ovName.text
     dlg.message = ["Playback options"]
-    capMode = toS(fldOf(m.video, "globalCaptionMode"))
-    capLbl = "Captions: off  (select to turn on, CC" + m.capChan.ToStr() + ")"
-    if capMode <> "" and capMode <> "Off" then
-        if m.capChan < 4 then
-            capLbl = "Captions: CC" + m.capChan.ToStr() + "  (select for CC" + (m.capChan + 1).ToStr() + ")"
-        else
-            capLbl = "Captions: CC4  (select to turn off)"
-        end if
-    end if
+    nxt = m.capChan + 1
+    if nxt > 4 then nxt = 1
+    capLbl = "Caption channel: CC" + m.capChan.ToStr() + "  (select for CC" + nxt.ToStr() + ")"
     dlg.buttons = ["Open channel guide", nerdLbl, favLbl, swLbl, capLbl]
     dlg.observeField("buttonSelected", "onPlayMenu")
     m.menuDlg = dlg
@@ -840,19 +885,14 @@ sub onPlayMenu(event as Object)
             startStream(m.playingId, "m3u8")
         end if
     else if idx = 4 then
-        cycleCaptions()
+        cycleCaptionChannel()
     end if
 end sub
 
-' Off -> CC1 -> CC2 -> CC3 -> CC4 -> Off. Also sets Roku's caption mode,
-' as Roku asks apps to do when the viewer switches captions on or off.
-sub cycleCaptions()
+' B button: captions on / off (Roku's caption mode, as Roku asks apps to do)
+sub toggleCaptions()
     mode = toS(fldOf(m.video, "globalCaptionMode"))
     if mode = "" or mode = "Off" then
-        m.capChan = 1
-        setCaptions(true)
-    else if m.capChan < 4 then
-        m.capChan = m.capChan + 1
         setCaptions(true)
     else
         setCaptions(false)
@@ -862,12 +902,27 @@ end sub
 sub setCaptions(on as Boolean)
     if on then
         if m.video.hasField("globalCaptionMode") then m.video.globalCaptionMode = "On"
-        if m.video.hasField("subtitleTrack") then m.video.subtitleTrack = "eia608/" + m.capChan.ToStr()
-        showStatus("Closed captions on: CC" + m.capChan.ToStr() + "  (no text appears if the stream carries no captions on this channel)", 5)
+        if m.video.hasField("subtitleTrack") and not m.vodPlaying then m.video.subtitleTrack = "eia608/" + m.capChan.ToStr()
+        if m.vodPlaying then
+            showStatus("Captions on", 3)
+        else
+            showStatus("Captions on (CC" + m.capChan.ToStr() + ")", 3)
+        end if
     else
         if m.video.hasField("globalCaptionMode") then m.video.globalCaptionMode = "Off"
-        showStatus("Closed captions off", 3)
+        showStatus("Captions off", 3)
     end if
+end sub
+
+' Replay menu: cycle the caption channel CC1 -> CC2 -> CC3 -> CC4 -> CC1
+sub cycleCaptionChannel()
+    m.capChan = m.capChan + 1
+    if m.capChan > 4 then m.capChan = 1
+    if m.video.hasField("subtitleTrack") then m.video.subtitleTrack = "eia608/" + m.capChan.ToStr()
+    mode = toS(fldOf(m.video, "globalCaptionMode"))
+    state = "on"
+    if mode = "" or mode = "Off" then state = "off - press B to turn them on"
+    showStatus("Caption channel CC" + m.capChan.ToStr() + "  (captions are " + state + ")", 4)
 end sub
 
 ' ---------------------------------------------------------------------
@@ -884,7 +939,7 @@ end function
 
 function saveList(key as String, arr as Object) as Boolean
     s = FormatJson(arr)
-    if Len(s) > 20000 then return false
+    if Len(s) > 14000 then return false
     regWrite(key, s)
     return true
 end function
@@ -912,7 +967,7 @@ sub addRecent(id as String, title as String, icon as String)
     rec = loadList("recents")
     out = [{ id: id, title: title, icon: icon }]
     for each e in rec
-        if e.id <> id and out.Count() < 25 then out.push(e)
+        if e.id <> id and out.Count() < 15 then out.push(e)
     end for
     saveList("recents", out)
 end sub
@@ -1004,6 +1059,21 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if lk = "a" or lk = "b" then key = lk
     if not isKnownKey(key) then print "SBWatch: unhandled key name: "; key
 
+    if m.detailOpen then
+        if key = "back" then closeDetail()
+        return true
+    end if
+
+    if m.vodPlaying then
+        if key = "back" then
+            stopPlayback()
+            showPendingResults()
+        else if key = "b" then
+            toggleCaptions()
+        end if
+        return true
+    end if
+
     if m.guideOpen then
         if key = "back" then
             closeGuide()
@@ -1046,7 +1116,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         else if key = "a" then
             toggleFav(m.playingId, m.ovName.text, m.playingIcon)
         else if key = "b" then
-            previousChannel()
+            toggleCaptions()
         else if key = "options" or key = "replay" then
             showPlayMenu()
         end if
@@ -1067,18 +1137,24 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             m.chList.setFocus(true)
             return true
         else if m.chList.isInFocusChain() and m.chList.content <> invalid then
-            m.catList.setFocus(true)
+            if m.navStack.Count() > 0 then
+                popNav()
+            else
+                m.catList.setFocus(true)
+            end if
             return true
         end if
         return false
     else if key = "options" or key = "a" then
         if m.chList.isInFocusChain() then
-            item = currentFocusedItem()
-            if item <> invalid then
-                if m.curCat = "__fav" then
-                    showFavMenu()
-                else
-                    toggleFav(item.id, chanName(item), item.HDPosterUrl)
+            if m.mode = "live" then
+                item = currentFocusedItem()
+                if item <> invalid then
+                    if m.curCat = "__fav" then
+                        showFavMenu()
+                    else
+                        toggleFav(item.id, chanName(item), item.HDPosterUrl)
+                    end if
                 end if
             end if
         else if key = "options" then
@@ -1090,7 +1166,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             openSearchDialog()
             return true
         else if m.chList.isInFocusChain() then
-            openGuide()
+            if m.mode = "live" then openGuide()
             return true
         end if
     else if key = "left" then
@@ -1131,13 +1207,28 @@ sub updateHint()
     else if m.epgList.isInFocusChain() then
         txt = "PROGRAM GUIDE     Up / Down: scroll programs     Left or Back: return to the channel list"
     else if m.chList.isInFocusChain() then
-        if m.curCat = "__fav" then
-            txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
+        lk = m.listKind
+        if m.mode = "live" then
+            if m.curCat = "__fav" then
+                txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
+            else
+                txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
+            end if
+        else if lk = "series" then
+            txt = "SERIES     OK: open series     Left or Back: categories"
+        else if lk = "seasons" then
+            txt = "SEASONS     OK: open season     Back: back to the series list"
+        else if lk = "episodes" then
+            txt = "EPISODES     OK: details and play     Back: back to the seasons"
+        else if lk = "continue" then
+            txt = "CONTINUE WATCHING     OK: resume or start over     Left or Back: categories"
         else
-            txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
+            txt = "MOVIES     OK: details and play     Left or Back: categories"
         end if
     else if m.catList.isInFocusChain() then
-        txt = "CATEGORIES     OK: open / run     Right: channels     Replay: search     *: change provider     Back: exit"
+        noun = "channels"
+        if m.mode <> "live" then noun = "titles"
+        txt = "CATEGORIES     OK: open / run     Right: " + noun + "     Replay: search     *: change provider     Back: exit"
     end if
     if txt <> "" then m.hint.text = txt
 end sub
