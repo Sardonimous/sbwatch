@@ -32,7 +32,7 @@ end function
 
 ' True when the visible list really is the saved favorites (same order).
 function favListInSync(idx as Integer, id as String) as Boolean
-    favs = loadList("favs")
+    favs = loadList(favKey())
     if idx < 0 or idx >= favs.Count() then return false
     return favs[idx].id = id
 end function
@@ -44,7 +44,7 @@ sub showFavMenu()
 
     if not favListInSync(m.favMenuIdx, item.id) then
         ' list and saved data disagree: just reload the saved favorites
-        m.chList.content = nodeFromList(loadList("favs"))
+        m.chList.content = nodeFromList(loadList(favKey()))
         showStatus("Favorites reloaded - press * again", 3)
         return
     end if
@@ -70,10 +70,10 @@ sub onFavMenu(event as Object)
     if idx = 0 then
         startFavMove(fpos)
     else if idx = 1 then
-        favs = loadList("favs")
+        favs = loadList(favKey())
         if fpos > 0 and fpos < favs.Count() then
             favs = favReorderArray(favs, fpos, 0)
-            saveList("favs", favs)
+            saveList(favKey(), favs)
             m.chList.content = nodeFromList(favs)
             m.chList.jumpToItem = 0
             showStatus("Moved to top", 2)
@@ -84,7 +84,7 @@ sub onFavMenu(event as Object)
 end sub
 
 sub startFavMove(fpos as Integer)
-    m.favMove = { idx: fpos, startIdx: fpos, orig: loadList("favs"), busy: false }
+    m.favMove = { idx: fpos, startIdx: fpos, orig: loadList(favKey()), busy: false }
     showStatus("Moving channel:  Up / Down to reposition,  OK to drop,  Back to cancel", 0)
     updateHint()
 end sub
@@ -98,10 +98,10 @@ sub favMoveFocused()
     d = idx - fm.idx
     if d <> 1 and d <> -1 then return
 
-    favs = loadList("favs")
+    favs = loadList(favKey())
     if idx < 0 or idx >= favs.Count() then return
     favs = favReorderArray(favs, fm.idx, idx)
-    saveList("favs", favs)
+    saveList(favKey(), favs)
 
     ' Rebuilding the list resets its focus, which raises focus events of
     ' our own making; ignore them until the short timer fires, then resync.
@@ -129,7 +129,7 @@ sub endFavMove(keep as Boolean)
     if keep then
         showStatus("Order saved", 2)
     else
-        saveList("favs", fm.orig)
+        saveList(favKey(), fm.orig)
         m.chList.content = nodeFromList(fm.orig)
         m.chList.jumpToItem = fm.startIdx
         showStatus("Move cancelled", 2)
@@ -139,7 +139,7 @@ end sub
 ' Publishes the set of favorite channel ids so list items can show a star.
 sub refreshFavIds()
     ids = {}
-    for each e in loadList("favs")
+    for each e in loadList(favKey())
         ids[e.id] = true
     end for
     m.global.favIds = ids

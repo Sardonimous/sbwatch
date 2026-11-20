@@ -31,6 +31,7 @@ sub init()
     m.nerdHideTimer = m.top.findNode("nerdHideTimer")
     m.nerdHideTimer.observeField("fire", "onNerdHide")
     m.prevChan = invalid
+    m.playingName = ""
     m.capChan = 1
 
     m.catList.observeField("itemSelected", "onCatSelected")
@@ -252,8 +253,8 @@ function rebuildCats() as Integer
     else
         items.push({ id: "__filter", title: "Filter: " + m.catFilter + "   (OK to edit / clear)" })
     end if
+    items.push({ id: "__fav", title: "Favorites" })
     if m.mode = "live" then
-        items.push({ id: "__fav", title: "Favorites" })
         items.push({ id: "__rec", title: "Recently Watched" })
     else
         items.push({ id: "__cont", title: "Continue Watching" })
@@ -357,7 +358,7 @@ sub onCatSelected(event as Object)
     end if
     m.listKind = "channels"
     if cat.id = "__fav" then
-        showChannels(nodeFromList(loadList("favs")), "No favorites yet. Press * on a channel to add one.")
+        showChannels(nodeFromList(loadList(favKey())), "No favorites yet. Press * on a channel to add one.")
     else if cat.id = "__rec" then
         showChannels(nodeFromList(loadList("recents")), "Nothing watched yet.")
     else
@@ -381,7 +382,10 @@ end sub
 
 sub showChannels(node as Object, emptyMsg as String)
     showStars = false
-    if m.mode = "live" and m.curCat <> "__fav" then showStars = true
+    if m.curCat <> "__fav" then
+        slk = m.listKind
+        if m.mode = "live" or slk = "movies" or slk = "series" then showStars = true
+    end if
     m.global.showFavStars = showStars
     m.chList.content = node
     updateHint()
@@ -414,6 +418,10 @@ sub onChFocused()
         favMoveFocused()
         return
     end if
+    if m.vodPlaying then
+        vodListFocused()
+        return
+    end if
     if m.video.visible then
         ' while watching, moving the (hidden) list selection = change channel
         idx = m.chList.itemFocused
@@ -436,12 +444,12 @@ sub onChSelected(event as Object)
         endFavMove(true)
         return
     end if
-    if m.mode <> "live" then
-        vodSelected(event.getData())
+    if m.vodPlaying or m.video.visible then
+        playerOk()
         return
     end if
-    if m.video.visible then
-        showOverlay()
+    if m.mode <> "live" then
+        vodSelected(event.getData())
         return
     end if
     m.playFromGuide = false
@@ -461,7 +469,7 @@ sub onEpgTimer()
     item = currentFocusedItem()
     if item = invalid then return
     m.focusedId = item.id
-    m.chName.text = chanName(item)
+    setRtl(m.chName, chanName(item), "font:MediumBoldSystemFont", 28, 0)
     setLogo(m.chLogo, item.HDPosterUrl)
     if m.mode <> "live" then
         updateVodPanel(item)
@@ -552,7 +560,7 @@ sub handleEpg(t as Object, id as String)
     m.epgCache[id] = entry
 
     if id = m.focusedId and not m.guideOpen then applyEpg(entry)
-    if id = m.playingId then m.ovEpg.text = ov
+    if id = m.playingId then setRtl(m.ovEpg, ov, "font:MediumSystemFont", 28, 0)
     if m.guideOpen then drawGuide()
 end sub
 
@@ -620,15 +628,16 @@ sub playChannel(index as Integer)
     m.playingIndex = index
     m.playingId = item.id
     m.triedTs = false
-    m.ovName.text = chanName(item)
-    m.ovEpg.text = ""
+    m.playingName = chanName(item)
+    setRtl(m.ovName, m.playingName, "font:LargeBoldSystemFont", 36, 0)
+    setRtl(m.ovEpg, "", "font:MediumSystemFont", 28, 0)
     m.playingIcon = ""
     if item.HDPosterUrl <> invalid then m.playingIcon = item.HDPosterUrl
     setLogo(m.ovLogo, m.playingIcon)
 
     e = cachedEpg(item.id)
     if e <> invalid then
-        m.ovEpg.text = e.ov
+        setRtl(m.ovEpg, e.ov, "font:MediumSystemFont", 28, 0)
     else
         requestEpg(item.id)
     end if
@@ -646,7 +655,7 @@ sub startStream(id as String, ext as String)
     url = m.server + "/live/" + urlEnc(m.user) + "/" + urlEnc(m.pass) + "/" + id + "." + ext
     c = CreateObject("roSGNode", "ContentNode")
     c.url = url
-    c.title = m.ovName.text
+    c.title = m.playingName
     if ext = "m3u8" then
         c.streamFormat = "hls"
     else
@@ -767,17 +776,21 @@ end function
 sub updateNerd()
     v = m.video
     lines = []
-    lines.push("STREAM INFO     (Replay > Hide stream info to close)")
+    lines.push("PLAYER INFO     OK again: playback options     Play/Pause: pause / resume     B: captions     A: favorite     Back: stop")
     lines.push("")
-    lines.push("Channel:    " + m.ovName.text + "   [stream id " + m.playingId + "]")
-
-    fmtName = "HLS (.m3u8)"
-    if m.curExt = "ts" then fmtName = "MPEG-TS (.ts)"
-    req = "Requested:  " + fmtName
-    if m.triedTs then req = req + "   (HLS failed, fell back automatically)"
-    lines.push(req)
-
-    lines.push("State:      " + v.state + "     Position: " + Int(v.position).ToStr() + " s")
+    if m.vodPlaying then
+        lines.push("Playing:    " + m.vod.title)
+        lines.push("Position:   " + fmtDur(Int(v.position)) + " / " + fmtDur(Int(v.duration)) + "     State: " + v.state + "     Left / Right: seek 10 s     Rewind / Fast-forward: 60 s")
+        lines.push("Source:     " + UCase(m.vod.ext) + " file")
+    else
+        lines.push("Channel:    " + m.playingName + "   [stream id " + m.playingId + "]")
+        fmtName = "HLS (.m3u8)"
+        if m.curExt = "ts" then fmtName = "MPEG-TS (.ts)"
+        req = "Requested:  " + fmtName
+        if m.triedTs then req = req + "   (HLS failed, fell back automatically)"
+        lines.push(req)
+        lines.push("State:      " + v.state + "     Position: " + Int(v.position).ToStr() + " s")
+    end if
 
     vf = toS(fldOf(v, "videoFormat"))
     af = toS(fldOf(v, "audioFormat"))
@@ -814,7 +827,10 @@ sub updateNerd()
 
     tracks = fldOf(v, "availableAudioTracks")
     if type(tracks) = "roArray" then
-        lines.push("Audio tracks: " + tracks.Count().ToStr() + "     Current: " + toS(fldOf(v, "currentAudioTrack")))
+        lines.push("Audio tracks: " + tracks.Count().ToStr() + "     Current: " + toS(fldOf(v, "currentAudioTrack")) + "     (OK > Audio track switches)")
+        for i = 0 to tracks.Count() - 1
+            if i < 6 and type(tracks[i]) = "roAssociativeArray" then lines.push("   " + dumpAA(tracks[i]))
+        end for
     end if
 
     if url = "" then url = v.content.url
@@ -848,46 +864,7 @@ end sub
 ' Playback menu (* while watching)
 ' ---------------------------------------------------------------------
 
-sub showPlayMenu()
-    nerdLbl = "Show stream info (nerd)"
-    if m.nerd.visible then nerdLbl = "Hide stream info"
-    favLbl = "Add to favorites"
-    if isFav(m.playingId) then favLbl = "Remove from favorites"
-    swLbl = "Force MPEG-TS (.ts)"
-    if m.curExt = "ts" then swLbl = "Force HLS (.m3u8)"
 
-    dlg = CreateObject("roSGNode", "StandardMessageDialog")
-    dlg.title = m.ovName.text
-    dlg.message = ["Playback options"]
-    nxt = m.capChan + 1
-    if nxt > 4 then nxt = 1
-    capLbl = "Caption channel: CC" + m.capChan.ToStr() + "  (select for CC" + nxt.ToStr() + ")"
-    dlg.buttons = ["Open channel guide", nerdLbl, favLbl, swLbl, capLbl]
-    dlg.observeField("buttonSelected", "onPlayMenu")
-    m.menuDlg = dlg
-    m.top.dialog = dlg
-end sub
-
-sub onPlayMenu(event as Object)
-    idx = event.getData()
-    m.menuDlg.close = true
-    if idx = 0 then
-        openGuide()
-    else if idx = 1 then
-        toggleNerd()
-    else if idx = 2 then
-        toggleFav(m.playingId, m.ovName.text, m.playingIcon)
-    else if idx = 3 then
-        if m.curExt = "m3u8" then
-            m.triedTs = true
-            startStream(m.playingId, "ts")
-        else
-            startStream(m.playingId, "m3u8")
-        end if
-    else if idx = 4 then
-        cycleCaptionChannel()
-    end if
-end sub
 
 ' B button: captions on / off (Roku's caption mode, as Roku asks apps to do)
 sub toggleCaptions()
@@ -939,7 +916,10 @@ end function
 
 function saveList(key as String, arr as Object) as Boolean
     s = FormatJson(arr)
-    if Len(s) > 14000 then return false
+    lim = 6000
+    if key = "favs" then lim = 10000
+    if key = "recents" then lim = 1500
+    if Len(s) > lim then return false
     regWrite(key, s)
     return true
 end function
@@ -957,7 +937,7 @@ function nodeFromList(arr as Object) as Object
 end function
 
 function isFav(id as String) as Boolean
-    for each e in loadList("favs")
+    for each e in loadList(favKey())
         if e.id = id then return true
     end for
     return false
@@ -967,7 +947,7 @@ sub addRecent(id as String, title as String, icon as String)
     rec = loadList("recents")
     out = [{ id: id, title: title, icon: icon }]
     for each e in rec
-        if e.id <> id and out.Count() < 15 then out.push(e)
+        if e.id <> id and out.Count() < 10 then out.push(e)
     end for
     saveList("recents", out)
 end sub
@@ -975,7 +955,7 @@ end sub
 sub toggleFav(id as String, title as String, iconIn as Dynamic)
     icon = ""
     if iconIn <> invalid then icon = iconIn
-    favs = loadList("favs")
+    favs = loadList(favKey())
     found = -1
     for i = 0 to favs.Count() - 1
         if favs[i].id = id then found = i
@@ -989,7 +969,7 @@ sub toggleFav(id as String, title as String, iconIn as Dynamic)
         note = "Added to favorites"
     end if
 
-    if not saveList("favs", favs) then
+    if not saveList(favKey(), favs) then
         showStatus("Favorites list is full (registry limit)", 4)
         return
     end if
@@ -1064,16 +1044,6 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
-    if m.vodPlaying then
-        if key = "back" then
-            stopPlayback()
-            showPendingResults()
-        else if key = "b" then
-            toggleCaptions()
-        end if
-        return true
-    end if
-
     if m.guideOpen then
         if key = "back" then
             closeGuide()
@@ -1095,31 +1065,8 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
-    if m.video.visible then
-        if key = "back" then
-            stopPlayback()
-            if m.playFromGuide then
-                m.playFromGuide = false
-                m.gKeep = true
-                openGuide()
-            else
-                showPendingResults()
-            end if
-        else if key = "up" then
-            zap(-1)
-        else if key = "down" then
-            zap(1)
-        else if key = "OK" then
-            showOverlay()
-        else if key = "left" then
-            openGuide()
-        else if key = "a" then
-            toggleFav(m.playingId, m.ovName.text, m.playingIcon)
-        else if key = "b" then
-            toggleCaptions()
-        else if key = "options" or key = "replay" then
-            showPlayMenu()
-        end if
+    if m.vodPlaying or m.video.visible then
+        playerKey(key)
         return true
     end if
 
@@ -1147,15 +1094,14 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return false
     else if key = "options" or key = "a" then
         if m.chList.isInFocusChain() then
-            if m.mode = "live" then
-                item = currentFocusedItem()
-                if item <> invalid then
-                    if m.curCat = "__fav" then
-                        showFavMenu()
-                    else
-                        toggleFav(item.id, chanName(item), item.HDPosterUrl)
-                    end if
-                end if
+            if key = "a" then
+                toggleFavFocused()
+            else if m.curCat = "__fav" then
+                showFavMenu()
+            else if m.curCat = "__rec" or m.curCat = "__cont" then
+                showItemMenu()
+            else
+                toggleFavFocused()
             end if
         else if key = "options" then
             beginLogin()
@@ -1208,22 +1154,26 @@ sub updateHint()
         txt = "PROGRAM GUIDE     Up / Down: scroll programs     Left or Back: return to the channel list"
     else if m.chList.isInFocusChain() then
         lk = m.listKind
-        if m.mode = "live" then
+        if m.curCat = "__rec" then
+            txt = "RECENTLY WATCHED     OK: play     *: remove item / clear list     A: favorite     Left or Back: categories"
+        else if m.curCat = "__cont" then
+            txt = "CONTINUE WATCHING     OK: resume or start over     *: remove item / clear list     A: favorite     Left or Back: categories"
+        else if m.curCat = "__fav" and m.mode <> "live" then
+            txt = "FAVORITES     OK: open / play     *: move / remove favorite     A: remove favorite     Left or Back: categories"
+        else if m.mode = "live" then
             if m.curCat = "__fav" then
                 txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
             else
                 txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
             end if
         else if lk = "series" then
-            txt = "SERIES     OK: open series     Left or Back: categories"
+            txt = "SERIES     OK: open series     A: add / remove favorite     Left or Back: categories"
         else if lk = "seasons" then
             txt = "SEASONS     OK: open season     Back: back to the series list"
         else if lk = "episodes" then
             txt = "EPISODES     OK: details and play     Back: back to the seasons"
-        else if lk = "continue" then
-            txt = "CONTINUE WATCHING     OK: resume or start over     Left or Back: categories"
         else
-            txt = "MOVIES     OK: details and play     Left or Back: categories"
+            txt = "MOVIES     OK: details and play     A: add / remove favorite     Left or Back: categories"
         end if
     else if m.catList.isInFocusChain() then
         noun = "channels"
@@ -1239,7 +1189,7 @@ end sub
 
 sub rememberPrev(newId as String)
     if m.playingId <> "" and m.playingId <> newId then
-        m.prevChan = { id: m.playingId, name: m.ovName.text, icon: m.playingIcon }
+        m.prevChan = { id: m.playingId, name: m.playingName, icon: m.playingIcon }
     end if
 end sub
 
@@ -1257,14 +1207,15 @@ sub playDirect(id as String, name as String, icon as String)
     m.playingIndex = -1
     m.playingId = id
     m.triedTs = false
-    m.ovName.text = name
-    m.ovEpg.text = ""
+    m.playingName = name
+    setRtl(m.ovName, name, "font:LargeBoldSystemFont", 36, 0)
+    setRtl(m.ovEpg, "", "font:MediumSystemFont", 28, 0)
     m.playingIcon = icon
     setLogo(m.ovLogo, icon)
 
     e = cachedEpg(id)
     if e <> invalid then
-        m.ovEpg.text = e.ov
+        setRtl(m.ovEpg, e.ov, "font:MediumSystemFont", 28, 0)
     else
         requestEpg(id)
     end if

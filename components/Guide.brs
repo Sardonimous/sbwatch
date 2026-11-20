@@ -233,7 +233,7 @@ sub guideCell(k as Integer, x as Integer, y as Integer, w as Integer, sg as Obje
     if w > 70 then
         tt.translation = [x + 10, y + 8]
         tt.width = w - 20
-        tt.text = sg.title
+        setRtl(tt, sg.title, "font:SmallBoldSystemFont", 24, 0)
         tt.color = tcol
         tt.visible = true
         if sg.kind = "prog" and w > 120 then
@@ -304,7 +304,7 @@ sub drawGuide()
                 m.gChBg[r].color = "0x2563EBFF"
             end if
             m.gChBg[r].visible = true
-            m.gChLbl[r].text = chanName(item)
+            setRtl(m.gChLbl[r], chanName(item), "font:MediumSystemFont", 28, 0)
             m.gChLbl[r].visible = true
             setLogo(m.gChLogo[r], item.HDPosterUrl)
             isFavRow = false
@@ -362,13 +362,13 @@ sub drawGuide()
         m.gNowLine.visible = false
     end if
 
-    m.gdChan.text = selChan
+    setRtl(m.gdChan, selChan, "font:SmallBoldSystemFont", 24, 0)
     if selSeg <> invalid then
-        m.gdTitle.text = selSeg.title
+        setRtl(m.gdTitle, selSeg.title, "font:MediumBoldSystemFont", 28, 0)
         if selSeg.kind = "prog" then
             mins = Int((selSeg.pe - selSeg.ps) / 60)
             m.gdTime.text = fmtTime(selSeg.ps) + " - " + fmtTime(selSeg.pe) + "   (" + mins.ToStr() + " min)"
-            m.gdDesc.text = selSeg.desc
+            setRtl(m.gdDesc, selSeg.desc, "font:SmallSystemFont", 24, 120)
         else
             m.gdTime.text = ""
             m.gdDesc.text = ""

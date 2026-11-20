@@ -10,6 +10,7 @@
     <script type="text/brightscript" uri="pkg:/components/Search.brs" />
     <script type="text/brightscript" uri="pkg:/components/Favorites.brs" />
     <script type="text/brightscript" uri="pkg:/components/Vod.brs" />
+    <script type="text/brightscript" uri="pkg:/components/Player.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
 
     <children>
@@ -59,7 +60,7 @@
         <Group id="detailView" visible="false">
             <Rectangle width="1920" height="1080" color="0x0B0F14FF" />
             <Poster id="detPoster" translation="[100,120]" width="400" height="600" visible="false"
-                    loadDisplayMode="scaleToFit" loadWidth="800" loadHeight="1200" />
+                    loadDisplayMode="scaleToFit" loadWidth="400" loadHeight="600" />
             <Label id="detTitle" translation="[560,120]" width="1260" height="110" wrap="true" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
             <Label id="detMeta" translation="[560,240]" width="1260" font="font:SmallSystemFont" color="0x60A5FAFF" />
             <Label id="detPlot" translation="[560,290]" width="1260" height="330" wrap="true" font="font:SmallSystemFont" color="0xC8D1DCFF" />

@@ -25,8 +25,8 @@ sub onContent()
     m.badge.color = col
     m.badge.text = kind
     m.time.text = c.timeText
-    m.title.text = c.title
-    m.desc.text = c.desc
+    setRtl(m.title, c.title, "font:MediumBoldSystemFont", 28, 0)
+    setRtl(m.desc, c.desc, "font:SmallSystemFont", 22, 34)
 
     if kind = "NOW" then
         p = c.progress

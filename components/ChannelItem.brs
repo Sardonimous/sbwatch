@@ -1,6 +1,7 @@
 sub init()
     m.logo = m.top.findNode("logo")
     m.name = m.top.findNode("name")
+    m.latFont = m.name.font
     m.star = m.top.findNode("star")
     m.global.observeField("favIds", "refreshStar")
     m.global.observeField("showFavStars", "refreshStar")
@@ -9,7 +10,7 @@ end sub
 sub onContent()
     c = m.top.itemContent
     if c = invalid then return
-    m.name.text = c.title
+    setRtl(m.name, c.title, m.latFont, 30, 0)
     setLogo(m.logo, c.HDPosterUrl)
     refreshStar()
 end sub

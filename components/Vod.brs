@@ -23,6 +23,9 @@ sub vodInit()
     m.vod = invalid
     m.seriesData = invalid
     m.pendingItem = invalid
+    m.vodListIdx = -1
+    m.itemMenuIdx = 0
+    m.menuActs = []
     m.titleLbl = m.top.findNode("title")
     m.vodPoster = m.top.findNode("vodPoster")
     m.vodInfo = m.top.findNode("vodInfo")
@@ -73,11 +76,7 @@ function listNoun() as String
 end function
 
 sub updateTitle()
-    if m.mode = "live" then
-        m.titleLbl.text = "SBWatch"
-    else
-        m.titleLbl.text = "SBWatch  -  " + modeName()
-    end if
+    m.titleLbl.text = "SBWatch - " + modeName()
 end sub
 
 ' ---------------------------------------------------------------------
@@ -107,13 +106,14 @@ end sub
 sub switchMode(newMode as String)
     m.mode = newMode
     regWrite("mode", newMode)
+    refreshFavIds()
     m.navStack = []
     m.seriesData = invalid
     m.curCat = ""
     m.listKind = "channels"
     m.allCats = []
     m.chList.content = invalid
-    m.chName.text = ""
+    setRtl(m.chName, "", "font:MediumBoldSystemFont", 28, 0)
     setLogo(m.chLogo, "")
     m.vodPoster.visible = false
     m.vodInfo.visible = false
@@ -129,7 +129,16 @@ end sub
 ' ---------------------------------------------------------------------
 
 sub vodCatSelected(cat as Object)
-    if cat.id = "__cont" then
+    if cat.id = "__fav" then
+        node = nodeFromList(loadList(favKey()))
+        if m.mode = "vod" then
+            m.listKind = "movies"
+            decorateResume(node, "m")
+        else
+            m.listKind = "series"
+        end if
+        showChannels(node, "No favorites yet. Press A on a title to add one.")
+    else if cat.id = "__cont" then
         m.listKind = "continue"
         showChannels(continueNode(), "Nothing to continue yet. Stop a movie or episode part-way and it will appear here.")
     else if m.mode = "vod" then
@@ -205,7 +214,7 @@ sub updateVodPanel(item as Object)
     else
         txt = txt + nl + "OK: details and play"
     end if
-    m.vodInfo.text = txt
+    setRtl(m.vodInfo, txt, "font:SmallSystemFont", 24, 34)
     m.vodInfo.visible = true
 end sub
 
@@ -352,20 +361,23 @@ function episodeDetail(ep as Object, sNum as Integer) as Object
     return { kind: "episode", key: "e" + ep.id, id: ep.id, title: d.name + "  -  S" + two(sNum) + "E" + two(ep.num) + "  " + et, icon: icon, ext: ext, plot: ep.plot, meta: meta, cast: "", dur: ep.dur, sid: d.id, season: sNum }
 end function
 
-sub openEpisode(item as Object)
+function episodeFromItem(item as Object) as Object
     d = m.seriesData
-    if d = invalid then return
+    if d = invalid then return invalid
     sNum = Int(Val(nodeStr(item, "season")))
     for each s in d.seasons
         if s.num = sNum then
             for each ep in s.eps
-                if ep.id = item.id then
-                    openDetail(episodeDetail(ep, sNum))
-                    return
-                end if
+                if ep.id = item.id then return episodeDetail(ep, sNum)
             end for
         end if
     end for
+    return invalid
+end function
+
+sub openEpisode(item as Object)
+    ed = episodeFromItem(item)
+    if ed <> invalid then openDetail(ed)
 end sub
 
 ' the episode that follows ep (same season, else first of the next season)
@@ -417,10 +429,10 @@ end sub
 sub openDetail(d as Object)
     m.detail = d
     setLogo(m.detPoster, d.icon)
-    m.detTitle.text = d.title
+    setRtl(m.detTitle, d.title, "font:LargeBoldSystemFont", 40, 42)
     m.detMeta.text = d.meta
-    m.detPlot.text = d.plot
-    m.detCast.text = d.cast
+    setRtl(m.detPlot, d.plot, "font:SmallSystemFont", 24, 95)
+    setRtl(m.detCast, d.cast, "font:SmallestSystemFont", 20, 120)
 
     e = resumeFor(d.key)
     labels = []
@@ -518,10 +530,10 @@ sub putResume(d as Object, posn as Integer, dur as Integer)
     end if
     out = [e]
     for each x in loadResume()
-        if x.k <> d.key and out.Count() < 40 then out.push(x)
+        if x.k <> d.key and out.Count() < 30 then out.push(x)
     end for
     js = FormatJson(out)
-    while Len(js) > 9000 and out.Count() > 1
+    while Len(js) > 5500 and out.Count() > 1
         out.Pop()
         js = FormatJson(out)
     end while
@@ -627,11 +639,13 @@ sub startVod(d as Object, startAt as Integer)
     fmt = vodFormat(d.ext)
     if fmt <> "" then c.streamFormat = fmt
     c.live = false
+    if m.video.hasField("subtitleTrack") then m.video.subtitleTrack = ""
     if startAt > 0 then c.PlayStart = startAt
     m.video.content = c
     m.video.visible = true
     m.video.control = "play"
-    m.video.setFocus(true)
+    syncVodList(d)
+    m.chList.setFocus(true)
     m.overlay.visible = false
     m.resumeTimer.control = "stop"
     m.resumeTimer.control = "start"
@@ -693,4 +707,134 @@ end sub
 
 sub onResumeTimer()
     if m.vodPlaying then saveVodProgress()
+end sub
+
+' ---------------------------------------------------------------------
+' Up / Down while an episode plays = previous / next episode of the list
+' ---------------------------------------------------------------------
+
+sub syncVodList(d as Object)
+    m.vodListIdx = m.chList.itemFocused
+    if m.listKind <> "episodes" then return
+    c = m.chList.content
+    if c = invalid then return
+    for i = 0 to c.getChildCount() - 1
+        if c.getChild(i).id = d.id then
+            m.vodListIdx = i
+            if i <> m.chList.itemFocused then m.chList.jumpToItem = i
+            return
+        end if
+    end for
+end sub
+
+sub vodListFocused()
+    idx = m.chList.itemFocused
+    if m.listKind <> "episodes" then
+        ' movies: the hidden list must not wander while watching
+        if idx <> m.vodListIdx and m.vodListIdx >= 0 then m.chList.jumpToItem = m.vodListIdx
+        return
+    end if
+    if idx < 0 or idx = m.vodListIdx then return
+    c = m.chList.content
+    if c = invalid then return
+    item = c.getChild(idx)
+    if item = invalid then return
+    ed = episodeFromItem(item)
+    if ed = invalid then return
+
+    saveVodProgress()
+    startAt = 0
+    e = resumeFor(ed.key)
+    if e <> invalid then startAt = e.p - 5
+    if startAt < 0 then startAt = 0
+    startVod(ed, startAt)
+end sub
+
+' ---------------------------------------------------------------------
+' Favorites per mode, and removing items from Recently Watched / Continue
+' ---------------------------------------------------------------------
+
+function favKey() as String
+    if m.mode = "vod" then return "favs_vod"
+    if m.mode = "series" then return "favs_series"
+    return "favs"
+end function
+
+' A: add / remove the highlighted title (a series' episodes use the series)
+sub toggleFavFocused()
+    item = currentFocusedItem()
+    if item = invalid then return
+    lk = m.listKind
+    if m.mode = "live" then
+        toggleFav(item.id, chanName(item), item.HDPosterUrl)
+    else if lk = "movies" or lk = "series" then
+        toggleFav(item.id, baseTitle(item), item.HDPosterUrl)
+    else if lk = "continue" and m.mode = "vod" then
+        toggleFav(item.id, baseTitle(item), item.HDPosterUrl)
+    else if lk = "seasons" or lk = "episodes" then
+        sd = m.seriesData
+        if sd <> invalid then toggleFav(sd.id, sd.name, sd.cover)
+    end if
+end sub
+
+sub showItemMenu()
+    item = currentFocusedItem()
+    if item = invalid then return
+    m.itemMenuIdx = m.chList.itemFocused
+    dlg = CreateObject("roSGNode", "StandardMessageDialog")
+    dlg.title = baseTitle(item)
+    if m.curCat = "__rec" then
+        dlg.message = ["Recently Watched"]
+    else
+        dlg.message = ["Continue Watching"]
+    end if
+    dlg.buttons = ["Remove this item", "Clear the whole list"]
+    dlg.observeField("buttonSelected", "onItemMenu")
+    m.itemDlg = dlg
+    m.top.dialog = dlg
+end sub
+
+sub onItemMenu(event as Object)
+    idx = event.getData()
+    m.itemDlg.close = true
+    c = m.chList.content
+    if c = invalid then return
+    item = c.getChild(m.itemMenuIdx)
+    if item = invalid then return
+
+    if m.curCat = "__rec" then
+        if idx = 0 then
+            out = []
+            for each e in loadList("recents")
+                if e.id <> item.id then out.push(e)
+            end for
+            saveList("recents", out)
+        else
+            saveList("recents", [])
+        end if
+        node = nodeFromList(loadList("recents"))
+    else
+        if idx = 0 then
+            removeResume(nodeStr(item, "rkey"))
+        else
+            regWrite("resume", "")
+        end if
+        node = continueNode()
+    end if
+
+    n = node.getChildCount()
+    m.chList.content = node
+    if n = 0 then
+        showStatus("The list is now empty", 3)
+        m.catList.setFocus(true)
+        return
+    end if
+    keep = m.itemMenuIdx
+    if keep >= n then keep = n - 1
+    if keep > 0 then m.chList.jumpToItem = keep
+    if idx = 0 then
+        showStatus("Removed", 2)
+    else
+        showStatus("List cleared", 2)
+    end if
 end sub

@@ -44,20 +44,25 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Favorites list | `*` | menu: Move (Up/Down, OK to drop, Back to cancel), Move to top, Remove |
 | Channel list | Replay | open the full guide |
 | Guide | Left/Right, Up/Down | program / channel; OK watch; Rewind/FF page; Replay = now; `*` favorite; Back close |
-| Watching | Up / Down | previous / next channel |
-| Watching | Left | open the guide |
-| Watching (started from the guide) | Back | returns to the guide |
-| Watching | A | add / remove the playing channel as a favorite (the remote reports it as the key name `A`) |
-| Watching | B | turn closed captions on / off |
-| Watching | Replay | playback menu (guide, stream info, favorite, force HLS/TS) |
-| Watching | `*` | the Roku system Options menu (captions, audio) |
+| Watching (any mode) | OK | first press: info screen (hides after 15 s); second press: playback options |
+| Watching (any mode) | Play/Pause | pause / resume |
+| Watching (any mode) | A | add / remove favorite (an episode favorites its series) |
+| Watching (any mode) | B | closed captions on / off |
+| Watching (any mode) | `*` | playback options (same menu as the second OK) |
+| Watching (any mode) | Back | stop (returns to the list, or to the guide if you started from it) |
+| Watching Live TV | Up / Down, Left | previous / next channel, open the guide |
+| Watching Movies / Series | Left / Right, Rewind / Fast-forward, Replay | seek 10 s, 60 s, back 10 s |
+| Watching Series | Up / Down | previous / next episode (from an episode list) |
+| Any list | A | add / remove favorite |
+| Recently Watched, Continue Watching | `*` | remove this item / clear the list |
 
 Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Press **B** to turn captions on or off; the Replay menu item **Caption channel** cycles CC1 -> CC2 -> CC3 -> CC4. (You can also use Roku's Settings > Accessibility > Captions.) DVB / teletext subtitles are not supported by the Roku player.
 
 ## Movies and Series notes
-- Resume points are stored in the Roku registry (newest 40, about 9 KB) together with Favorites (about 100 channels) and Recently Watched (15), because the registry is limited to 32 KB. A resume point is saved after 30 seconds of viewing and cleared when you finish (95% watched).
+- Everything saved on the Roku shares its 32 KB registry: Live favorites (about 70), Movie favorites and Series favorites (about 40 each), Recently Watched (10) and resume points (newest 30). A resume point is saved after 30 seconds of viewing and cleared when you finish (95% watched).
 - Playback uses the Roku player's own controls: OK pause / play, Left / Right and Rewind / Fast-forward to seek, `*` for audio and subtitle choices, Back to stop. B turns captions on / off.
-- Favorites, Recently Watched and the program guide are for Live TV only. Resume data is cleared if you change provider.
+- Favorites exist separately for Live TV, Movies and Series (a series is favorited as a whole). Recently Watched and the program guide are for Live TV only. Resume data is cleared if you change provider.
+- Playback options include **Audio track** when a file has several audio tracks - useful when a movie plays without sound (the info screen lists each track and codec; the Roku cannot decode every audio format, e.g. DTS).
 
 ## Notes
 - Stream info: the player's "latency" field returns 2147483647 (the largest 32-bit number) on these streams, which is a placeholder for "not reported", so the panel says so.
@@ -81,6 +86,9 @@ Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4)
 
 ## Development
 `python3 tools/lint.py` runs a structural check (balanced blocks, undefined functions, reserved words used as variable names). `./build.sh` builds `dist/SBWatch.zip`.
+
+## Arabic text
+Roku has no Arabic glyphs and does not join or reorder right-to-left text. SBWatch shapes Arabic itself (letter joining, right-to-left order, mixed Arabic / English lines) and draws it with the bundled **DejaVu Sans** font. It applies to titles in lists, the guide, the details screen and the info panels. DejaVu Sans is distributed under its own free license (`fonts/LICENSE-DejaVu.txt`).
 
 ## Credits
 Written by Claude (Anthropic) with the repository owner, who directed the project and tested it on hardware.
