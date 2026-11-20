@@ -20,8 +20,8 @@ SBWatch is only a player. You supply your own Xtream provider; no content or cre
 
 ## Install (developer mode)
 1. On the Roku: Home x3, Up x2, Right, Left, Right, Left, Right -> enable developer mode, set a web password, note the IP.
-2. Build the package: `./build.sh` (creates `dist/SBWatch.zip`).
-3. Browse to `http://ROKU_IP`, log in (user `rokudev`), upload `dist/SBWatch.zip`, click Install.
+2. Build the package: `./build.sh` (creates `dist/SBWatch-v<version>.zip`).
+3. Browse to `http://ROKU_IP`, log in (user `rokudev`), upload the zip from `dist/`, click Install.
 4. Debug console (optional): `telnet ROKU_IP 8085`
 
 ## Entering the provider
@@ -85,7 +85,7 @@ Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4)
     build.sh            builds dist/SBWatch.zip
 
 ## Development
-`python3 tools/lint.py` runs a structural check (balanced blocks, undefined functions, reserved words used as variable names). `./build.sh` builds `dist/SBWatch.zip`.
+`python3 tools/lint.py` runs a structural check (balanced blocks, undefined functions, reserved words used as variable names). `./build.sh` builds `dist/SBWatch-v<version>.zip`.
 
 ## Arabic text
 Roku has no Arabic glyphs and does not join or reorder right-to-left text. SBWatch shapes Arabic itself (letter joining, right-to-left order, mixed Arabic / English lines) and draws it with a trimmed copy of the **DejaVu Sans** font (76 KB, see `fonts/README.txt`). It applies to titles in lists, the guide, the details screen and the info panels. DejaVu Sans is distributed under its own free license (`fonts/LICENSE-DejaVu.txt`).

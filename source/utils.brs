@@ -358,17 +358,13 @@ function arShapeRun(cs as Object, tbl as Object) as Object
     return rev
 end function
 
-function arRunText(rn as Object, tbl as Object) as String
+function arRunText(rec as Object, tbl as Object) as String
+    codes = rec.rc
+    if rec.rk = "A" then codes = arShapeRun(rec.rc, tbl)
     s = ""
-    if rn.c = "A" then
-        for each c in arShapeRun(rn.cs, tbl)
-            s = s + Chr(c)
-        end for
-    else
-        for each c in rn.cs
-            s = s + Chr(c)
-        end for
-    end if
+    for i = 0 to codes.Count() - 1
+        s = s + Chr(codes[i])
+    end for
     return s
 end function
 
@@ -445,7 +441,7 @@ function arShape(t as String) as String
                 going = false
             end if
         end while
-        runs.push({ c: cls[i], cs: seg })
+        runs.push({ rk: cls[i], rc: seg })
         i = k
     end while
 
