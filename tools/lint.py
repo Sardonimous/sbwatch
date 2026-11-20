@@ -12,7 +12,8 @@ for f in sorted(glob.glob('components/*.brs')+glob.glob('source/*.brs')):
     # reserved words used as identifiers (outside strings/comments, not after a dot)
     for n,l in enumerate(t.splitlines(),1):
         code=re.sub(r'"[^"]*"','""',l).split("'")[0]
-        for m_ in re.finditer(r'(?<![\.\w])(pos|tab|box|dim|eval|let|line_num|rem|objfun|getglobalaa)\b',code,re.I):
+        if re.match(r'^\s*sub run\(\)\s*$',l): continue
+        for m_ in re.finditer(r'(?<![\.\w])(pos|tab|box|dim|eval|let|line_num|rem|objfun|getglobalaa|run)\b',code,re.I):
             print("RESERVED WORD",f,n,m_.group(1),"|",l.strip()); bad=True
 defs={d.lower() for d in re.findall(r'^(?:sub|function)\s+(\w+)',src,re.M|re.I)}
 calls=set(re.findall(r'(?<![\.\w])([a-zA-Z_]\w*)\(',src))

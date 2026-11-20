@@ -88,7 +88,7 @@ Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4)
 `python3 tools/lint.py` runs a structural check (balanced blocks, undefined functions, reserved words used as variable names). `./build.sh` builds `dist/SBWatch.zip`.
 
 ## Arabic text
-Roku has no Arabic glyphs and does not join or reorder right-to-left text. SBWatch shapes Arabic itself (letter joining, right-to-left order, mixed Arabic / English lines) and draws it with the bundled **DejaVu Sans** font. It applies to titles in lists, the guide, the details screen and the info panels. DejaVu Sans is distributed under its own free license (`fonts/LICENSE-DejaVu.txt`).
+Roku has no Arabic glyphs and does not join or reorder right-to-left text. SBWatch shapes Arabic itself (letter joining, right-to-left order, mixed Arabic / English lines) and draws it with a trimmed copy of the **DejaVu Sans** font (76 KB, see `fonts/README.txt`). It applies to titles in lists, the guide, the details screen and the info panels. DejaVu Sans is distributed under its own free license (`fonts/LICENSE-DejaVu.txt`).
 
 ## Credits
 Written by Claude (Anthropic) with the repository owner, who directed the project and tested it on hardware.

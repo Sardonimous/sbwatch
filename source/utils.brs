@@ -358,14 +358,14 @@ function arShapeRun(cs as Object, tbl as Object) as Object
     return rev
 end function
 
-function arRunText(run as Object, tbl as Object) as String
+function arRunText(rn as Object, tbl as Object) as String
     s = ""
-    if run.c = "A" then
-        for each c in arShapeRun(run.cs, tbl)
+    if rn.c = "A" then
+        for each c in arShapeRun(rn.cs, tbl)
             s = s + Chr(c)
         end for
     else
-        for each c in run.cs
+        for each c in rn.cs
             s = s + Chr(c)
         end for
     end if
