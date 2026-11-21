@@ -16,6 +16,13 @@ sub init()
     m.overlay = m.top.findNode("overlay")
     m.ovName = m.top.findNode("ovName")
     m.ovLogo = m.top.findNode("ovLogo")
+    m.ovHelp = m.top.findNode("ovHelp")
+    m.okPrompt = false
+    m.audioCheckTimer = m.top.findNode("audioCheckTimer")
+    m.audioCheckTimer.observeField("fire", "onAudioCheck")
+    m.sortBase = invalid
+    m.sortCur = invalid
+    m.sortIdx = -1
     m.chLogo = m.top.findNode("chLogo")
     m.playingIcon = ""
     m.ovEpg = m.top.findNode("ovEpg")
@@ -655,12 +662,13 @@ sub startStream(id as String, ext as String)
     url = m.server + "/live/" + urlEnc(m.user) + "/" + urlEnc(m.pass) + "/" + id + "." + ext
     c = CreateObject("roSGNode", "ContentNode")
     c.url = url
-    c.title = m.playingName
+    c.title = nodeTitle(m.playingName)
     if ext = "m3u8" then
         c.streamFormat = "hls"
     else
         c.streamFormat = "ts"
     end if
+    logLine("play live: " + maskUrl(url) + "  (" + ext + ")")
     c.live = true
     ' Roku shows in-band EIA-608 captions only when the channel is declared
     ' (a decoder such as ExoPlayer finds them by itself): CC1..CC4
@@ -676,6 +684,7 @@ sub startStream(id as String, ext as String)
 end sub
 
 sub onVideoState()
+    logLine("video state: " + m.video.state)
     if m.vodPlaying then
         onVodState()
         return
@@ -686,12 +695,13 @@ sub onVideoState()
     else if st = "playing" then
         hideStatus()
     else if st = "error" then
+        logVideoError("live " + m.curExt)
         if m.curExt = "m3u8" and not m.triedTs then
             m.triedTs = true
             showStatus("HLS failed, trying MPEG-TS ...", 0)
             startStream(m.playingId, "ts")
         else
-            showStatus("Playback error: " + m.video.errorMsg + "  (Back to return)", 0)
+            showStatus("Playback error: " + m.video.errorMsg + "  (code " + toS(fldOf(m.video, "errorCode")) + ", Back to return)", 0)
             showOverlay()
         end if
     end if
@@ -731,13 +741,22 @@ sub zap(delta as Integer)
 end sub
 
 sub showOverlay()
+    m.ovHelp.visible = false
+    m.okPrompt = false
+    showOverlayFor(5)
+end sub
+
+sub showOverlayFor(secs as Integer)
     m.overlay.visible = true
+    m.ovTimer.duration = secs
     m.ovTimer.control = "stop"
     m.ovTimer.control = "start"
 end sub
 
 sub onOvTimer()
     m.overlay.visible = false
+    m.ovHelp.visible = false
+    m.okPrompt = false
 end sub
 
 ' ---------------------------------------------------------------------
@@ -765,6 +784,8 @@ end sub
 
 sub onNerdTimer()
     if m.nerd.visible then updateNerd()
+    if m.overlay.visible and m.vodPlaying then updateVodBanner()
+    if not m.nerd.visible and not m.overlay.visible then m.nerdTimer.control = "stop"
 end sub
 
 function maskUrl(u as String) as String
@@ -776,12 +797,15 @@ end function
 sub updateNerd()
     v = m.video
     lines = []
-    lines.push("PLAYER INFO     OK again: playback options     Play/Pause: pause / resume     B: captions     A: favorite     Back: stop")
+    lines.push("STREAM INFO     (hides after 15 seconds)")
     lines.push("")
     if m.vodPlaying then
         lines.push("Playing:    " + m.vod.title)
         lines.push("Position:   " + fmtDur(Int(v.position)) + " / " + fmtDur(Int(v.duration)) + "     State: " + v.state + "     Left / Right: seek 10 s     Rewind / Fast-forward: 60 s")
         lines.push("Source:     " + UCase(m.vod.ext) + " file")
+        if toS(m.vod.vinfo) <> "" or toS(m.vod.ainfo) <> "" then lines.push("Provider data:  video " + toS(m.vod.vinfo) + "     audio " + toS(m.vod.ainfo))
+        pw = audioWarn(toS(m.vod.ainfo))
+        if pw <> "" then lines.push("WARNING: " + pw)
     else
         lines.push("Channel:    " + m.playingName + "   [stream id " + m.playingId + "]")
         fmtName = "HLS (.m3u8)"
@@ -804,15 +828,7 @@ sub updateNerd()
         h = toS(ss.height)
         res = "n/a"
         if w <> "" and w <> "0" then res = w + " x " + h
-        lines.push("Resolution: " + res + "     Segment bitrate: " + fmtBps(ss.segBitrateBps) + "     Seg #" + toS(ss.segSequence))
-        if ss.DoesExist("latency") then
-            lat = toS(ss.latency)
-            if lat = "2147483647" then
-                lines.push("Latency: not reported  (the player returned 2147483647, the largest 32-bit number, as an 'unknown' placeholder)")
-            else
-                lines.push("Latency (reported by the player; Roku does not document its units): " + lat)
-            end if
-        end if
+        lines.push("Resolution: " + res + "     Segment #" + toS(ss.segSequence))
     end if
 
     si = fldOf(v, "streamInfo")
@@ -827,7 +843,7 @@ sub updateNerd()
 
     tracks = fldOf(v, "availableAudioTracks")
     if type(tracks) = "roArray" then
-        lines.push("Audio tracks: " + tracks.Count().ToStr() + "     Current: " + toS(fldOf(v, "currentAudioTrack")) + "     (OK > Audio track switches)")
+        lines.push("Audio tracks: " + tracks.Count().ToStr() + "     Current: " + toS(fldOf(v, "currentAudioTrack")) + "     (Playback options > Audio track switches)")
         for i = 0 to tracks.Count() - 1
             if i < 6 and type(tracks[i]) = "roAssociativeArray" then lines.push("   " + dumpAA(tracks[i]))
         end for
@@ -857,7 +873,7 @@ sub updateNerd()
     for each ln in lines
         txt = txt + ln + Chr(10)
     end for
-    m.nerdText.text = txt
+    setRtl(m.nerdText, txt, "font:SmallSystemFont", 24, 0)
 end sub
 
 ' ---------------------------------------------------------------------
@@ -1008,6 +1024,7 @@ sub runTask(kind as String, url as String, param as String, handler as String)
 end sub
 
 sub showStatus(text as String, seconds as Integer)
+    if looksLikeError(text) then logLine("STATUS: " + text)
     m.status.text = text
     y = 930
     if m.video.visible and not m.guideOpen then y = 745
@@ -1107,6 +1124,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             beginLogin()
         end if
         return true
+    else if key = "b" then
+        if m.chList.isInFocusChain() then
+            cycleSort()
+            return true
+        end if
     else if key = "replay" then
         if m.catList.isInFocusChain() then
             openSearchDialog()
@@ -1155,26 +1177,27 @@ sub updateHint()
     else if m.chList.isInFocusChain() then
         lk = m.listKind
         if m.curCat = "__rec" then
-            txt = "RECENTLY WATCHED     OK: play     *: remove item / clear list     A: favorite     Left or Back: categories"
+            txt = "RECENTLY WATCHED     OK: play     *: remove item / clear list     A: favorite     Back: categories"
         else if m.curCat = "__cont" then
-            txt = "CONTINUE WATCHING     OK: resume or start over     *: remove item / clear list     A: favorite     Left or Back: categories"
+            txt = "CONTINUE WATCHING     OK: resume or start over     *: remove item / clear list     A: favorite     Back: categories"
         else if m.curCat = "__fav" and m.mode <> "live" then
-            txt = "FAVORITES     OK: open / play     *: move / remove favorite     A: remove favorite     Left or Back: categories"
+            txt = "FAVORITES     OK: open / play     *: move / remove favorite     A: remove favorite     Back: categories"
         else if m.mode = "live" then
             if m.curCat = "__fav" then
-                txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
+                txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Back: categories"
             else
-                txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Left or Back: categories"
+                txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Back: categories"
             end if
         else if lk = "series" then
-            txt = "SERIES     OK: open series     A: add / remove favorite     Left or Back: categories"
+            txt = "SERIES     OK: open series     A: add / remove favorite     Back: categories"
         else if lk = "seasons" then
             txt = "SEASONS     OK: open season     Back: back to the series list"
         else if lk = "episodes" then
             txt = "EPISODES     OK: details and play     Back: back to the seasons"
         else
-            txt = "MOVIES     OK: details and play     A: add / remove favorite     Left or Back: categories"
+            txt = "MOVIES     OK: details and play     A: add / remove favorite     Back: categories"
         end if
+        if lk <> "seasons" and lk <> "episodes" and txt <> "" then txt = txt + "     B: sort"
     else if m.catList.isInFocusChain() then
         noun = "channels"
         if m.mode <> "live" then noun = "titles"

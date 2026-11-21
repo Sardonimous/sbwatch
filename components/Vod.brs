@@ -35,6 +35,7 @@ sub vodInit()
     m.detMeta = m.top.findNode("detMeta")
     m.detPlot = m.top.findNode("detPlot")
     m.detCast = m.top.findNode("detCast")
+    m.detTech = m.top.findNode("detTech")
     m.detActions = m.top.findNode("detActions")
     m.detActions.observeField("itemSelected", "onDetAction")
     m.resumeTimer = m.top.findNode("resumeTimer")
@@ -256,7 +257,7 @@ sub onVodInfo(event as Object)
     if d.director <> "" then cast = "Director: " + d.director
     if d.cast <> "" then cast = joinMeta(cast, "Cast: " + d.cast)
 
-    openDetail({ kind: "movie", key: "m" + item.id, id: item.id, title: baseTitle(item), icon: icon, ext: ext, plot: d.plot, meta: meta, cast: cast, dur: d.dur, sid: "", season: 0 })
+    openDetail({ kind: "movie", key: "m" + item.id, id: item.id, title: baseTitle(item), icon: icon, ext: ext, plot: d.plot, meta: meta, cast: cast, dur: d.dur, sid: "", season: 0, vinfo: d.vinfo, ainfo: d.ainfo })
 end sub
 
 function joinMeta(a as String, b as String) as String
@@ -358,7 +359,7 @@ function episodeDetail(ep as Object, sNum as Integer) as Object
     if icon = "" then icon = d.cover
     meta = "Season " + sNum.ToStr() + "     Episode " + ep.num.ToStr()
     if ep.dur > 0 then meta = joinMeta(meta, fmtDur(ep.dur))
-    return { kind: "episode", key: "e" + ep.id, id: ep.id, title: d.name + "  -  S" + two(sNum) + "E" + two(ep.num) + "  " + et, icon: icon, ext: ext, plot: ep.plot, meta: meta, cast: "", dur: ep.dur, sid: d.id, season: sNum }
+    return { kind: "episode", key: "e" + ep.id, id: ep.id, title: d.name + "  -  S" + two(sNum) + "E" + two(ep.num) + "  " + et, icon: icon, ext: ext, plot: ep.plot, meta: meta, cast: "", dur: ep.dur, sid: d.id, season: sNum, vinfo: ep.vinfo, ainfo: ep.ainfo }
 end function
 
 function episodeFromItem(item as Object) as Object
@@ -434,6 +435,26 @@ sub openDetail(d as Object)
     setRtl(m.detPlot, d.plot, "font:SmallSystemFont", 24, 95)
     setRtl(m.detCast, d.cast, "font:SmallestSystemFont", 20, 120)
 
+    tech = ""
+    if toS(d.vinfo) <> "" then tech = "Video: " + d.vinfo
+    if toS(d.ainfo) <> "" then tech = joinMeta(tech, "Audio: " + d.ainfo)
+    warn = audioWarn(toS(d.ainfo))
+    if warn <> "" then
+        tech = tech + Chr(10) + warn
+        m.detTech.color = "0xFFD166FF"
+    else
+        m.detTech.color = "0x8A97A6FF"
+    end if
+    setRtl(m.detTech, tech, "font:SmallestSystemFont", 20, 0)
+
+    fillDetActions(d, 0)
+    hideStatus()
+    m.detGroup.visible = true
+    m.detailOpen = true
+    m.detActions.setFocus(true)
+end sub
+
+sub fillDetActions(d as Object, keepIdx as Integer)
     e = resumeFor(d.key)
     labels = []
     m.detActs = []
@@ -446,6 +467,15 @@ sub openDetail(d as Object)
         labels.push("Play")
         m.detActs.push("play")
     end if
+    favLbl = "Add to favorites"
+    if d.kind = "episode" then favLbl = "Add series to favorites"
+    if isFav(favIdOfDetail(d)) then
+        favLbl = "Remove from favorites"
+        if d.kind = "episode" then favLbl = "Remove series from favorites"
+    end if
+    labels.push(favLbl)
+    m.detActs.push("fav")
+
     items = []
     for each l in labels
         items.push({ title: l })
@@ -453,12 +483,7 @@ sub openDetail(d as Object)
     node = CreateObject("roSGNode", "ContentNode")
     node.update({ children: items }, true)
     m.detActions.content = node
-    m.detActions.jumpToItem = 0
-
-    hideStatus()
-    m.detGroup.visible = true
-    m.detailOpen = true
-    m.detActions.setFocus(true)
+    if keepIdx > 0 then m.detActions.jumpToItem = keepIdx
 end sub
 
 sub closeDetail()
@@ -473,6 +498,11 @@ sub onDetAction(event as Object)
     if idx < 0 or idx >= m.detActs.Count() then return
     act = m.detActs[idx]
     d = m.detail
+    if act = "fav" then
+        toggleFavDetail(d)
+        fillDetActions(d, idx)
+        return
+    end if
     startAt = 0
     if act = "resume" then
         e = resumeFor(d.key)
@@ -564,7 +594,7 @@ sub openContinue(item as Object)
     if e.ty = "e" then kind = "episode"
     ext = e.x
     if ext = "" then ext = "mp4"
-    openDetail({ kind: kind, key: e.k, id: e.id, title: e.n, icon: e.i, ext: ext, plot: "", meta: "Stopped at " + fmtDur(e.p) + " of " + fmtDur(e.d), cast: "", dur: e.d, sid: e.sid, season: e.se })
+    openDetail({ kind: kind, key: e.k, id: e.id, title: e.n, icon: e.i, ext: ext, plot: "", meta: "Stopped at " + fmtDur(e.p) + " of " + fmtDur(e.d), cast: "", dur: e.d, sid: e.sid, season: e.se, vinfo: "", ainfo: "" })
 end sub
 
 ' adds "   (resume 12:34)" to the titles of items that have saved progress
@@ -588,11 +618,7 @@ function cloneList(node as Object) as Object
     items = []
     for i = 0 to node.getChildCount() - 1
         ch = node.getChild(i)
-        it = { id: ch.id, title: ch.title, HDPosterUrl: ch.HDPosterUrl }
-        for each f in ["rating", "ext", "dur", "plot", "season", "epnum", "et", "rkey"]
-            if ch.hasField(f) then it[f] = ch.getField(f)
-        end for
-        items.push(it)
+        items.push(itemAA(ch))
     end for
     root = CreateObject("roSGNode", "ContentNode")
     root.update({ children: items }, true)
@@ -633,9 +659,10 @@ sub startVod(d as Object, startAt as Integer)
     if d.kind = "episode" then seg = "series"
     url = m.server + "/" + seg + "/" + urlEnc(m.user) + "/" + urlEnc(m.pass) + "/" + d.id + "." + d.ext
 
+    logLine("play vod: " + maskUrl(url) + "  start=" + startAt.ToStr() + "s  provider audio=" + toS(d.ainfo) + "  video=" + toS(d.vinfo))
     c = CreateObject("roSGNode", "ContentNode")
     c.url = url
-    c.title = d.title
+    c.title = nodeTitle(d.title)
     fmt = vodFormat(d.ext)
     if fmt <> "" then c.streamFormat = fmt
     c.live = false
@@ -663,10 +690,13 @@ sub onVodState()
     else if st = "playing" then
         m.vodStarted = true
         hideStatus()
+        m.audioCheckTimer.control = "stop"
+        m.audioCheckTimer.control = "start"
     else if st = "finished" then
         onVodFinished()
     else if st = "error" then
-        showStatus("Playback error: " + m.video.errorMsg + "  (Back to return)", 0)
+        logVideoError("vod " + m.vod.ext)
+        showStatus("Playback error: " + m.video.errorMsg + "  (code " + toS(fldOf(m.video, "errorCode")) + ", Back to return)", 0)
     end if
 end sub
 
@@ -782,7 +812,7 @@ sub showItemMenu()
     if item = invalid then return
     m.itemMenuIdx = m.chList.itemFocused
     dlg = CreateObject("roSGNode", "StandardMessageDialog")
-    dlg.title = baseTitle(item)
+    dlg.title = dlgTitle(baseTitle(item), "Remove from list")
     if m.curCat = "__rec" then
         dlg.message = ["Recently Watched"]
     else

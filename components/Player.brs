@@ -73,7 +73,9 @@ end sub
 
 ' First OK shows the info screen, the next OK opens the playback options.
 sub playerOk()
-    if m.nerd.visible then
+    if m.okPrompt then
+        m.okPrompt = false
+        m.ovHelp.visible = false
         showPlayMenu()
     else
         showInfo()
@@ -81,13 +83,13 @@ sub playerOk()
 end sub
 
 sub showInfo()
-    updateNerd()
-    m.nerd.visible = true
+    if m.vodPlaying then updateVodBanner()
+    m.ovHelp.text = "OK again: playback options     Play/Pause: pause / resume     A: favorite     B: captions     Back: stop"
+    m.ovHelp.visible = true
+    m.okPrompt = true
+    showOverlayFor(8)
     m.nerdTimer.control = "stop"
     m.nerdTimer.control = "start"
-    m.nerdHideTimer.control = "stop"
-    m.nerdHideTimer.control = "start"
-    if not m.vodPlaying then showOverlay()
 end sub
 
 ' ---------------------------------------------------------------------
@@ -111,21 +113,30 @@ end function
 
 sub toggleFavPlaying()
     if m.vodPlaying then
-        d = m.vod
-        if d.kind = "episode" then
-            sd = m.seriesData
-            if sd <> invalid and sd.id = d.sid then
-                toggleFav(sd.id, sd.name, sd.cover)
-            else
-                showStatus("Open the series from the Series list to add it to Favorites", 4)
-            end if
-        else
-            toggleFav(d.id, d.title, d.icon)
-        end if
+        toggleFavDetail(m.vod)
     else
         toggleFav(m.playingId, m.playingName, m.playingIcon)
     end if
 end sub
+
+' favorite of a movie / episode detail record (an episode counts for its series)
+sub toggleFavDetail(d as Object)
+    if d.kind = "episode" then
+        sd = m.seriesData
+        if sd <> invalid and sd.id = d.sid then
+            toggleFav(sd.id, sd.name, sd.cover)
+        else
+            showStatus("Open the series from the Series list to add it to Favorites", 4)
+        end if
+    else
+        toggleFav(d.id, d.title, d.icon)
+    end if
+end sub
+
+function favIdOfDetail(d as Object) as String
+    if d.kind = "episode" then return d.sid
+    return d.id
+end function
 
 ' ---------------------------------------------------------------------
 ' Audio tracks (some files have a silent or unsupported default track)
@@ -187,6 +198,11 @@ sub showPlayMenu()
         m.menuActs.push("guide")
     end if
 
+    infoLbl = "Show stream info"
+    if m.nerd.visible then infoLbl = "Hide stream info"
+    labels.push(infoLbl)
+    m.menuActs.push("info")
+
     favLbl = "Add to favorites"
     if isFavPlaying() then favLbl = "Remove from favorites"
     if m.vodPlaying then
@@ -219,8 +235,7 @@ sub showPlayMenu()
     title = m.playingName
     if m.vodPlaying then title = m.vod.title
     dlg = CreateObject("roSGNode", "StandardMessageDialog")
-    dlg.title = title
-    dlg.message = ["Playback options"]
+    dlg.title = dlgTitle(title, "Playback options")
     dlg.buttons = labels
     dlg.observeField("buttonSelected", "onPlayMenu")
     m.menuDlg = dlg
@@ -234,6 +249,8 @@ sub onPlayMenu(event as Object)
     act = m.menuActs[idx]
     if act = "guide" then
         openGuide()
+    else if act = "info" then
+        toggleNerd()
     else if act = "fav" then
         toggleFavPlaying()
     else if act = "fmt" then
@@ -247,5 +264,44 @@ sub onPlayMenu(event as Object)
         cycleCaptionChannel()
     else if act = "audio" then
         cycleAudioTrack()
+    end if
+end sub
+
+' progress line + title shown for a movie / episode when OK is pressed
+sub updateVodBanner()
+    d = m.vod
+    if d = invalid then return
+    setLogo(m.ovLogo, d.icon)
+    setRtl(m.ovName, d.title, "font:LargeBoldSystemFont", 36, 0)
+    dur = Int(m.video.duration)
+    posn = Int(m.video.position)
+    txt = fmtDur(posn) + " / " + fmtDur(dur)
+    if dur > 0 then txt = txt + "     " + (posn * 100 \ dur).ToStr() + "%"
+    if m.video.state = "paused" then txt = txt + "     (paused)"
+    txt = txt + Chr(10) + "Left / Right: seek 10 s     Rewind / Fast-forward: 60 s     Replay: back 10 s"
+    setRtl(m.ovEpg, txt, "font:MediumSystemFont", 28, 0)
+end sub
+
+' full details of a playback error go to the debug log (the on-screen message is brief)
+sub logVideoError(where as String)
+    v = m.video
+    logLine("VIDEO ERROR (" + where + ")  code=" + toS(fldOf(v, "errorCode")) + "  msg=" + toS(fldOf(v, "errorMsg")) + "  str=" + toS(fldOf(v, "errorStr")))
+    ei = fldOf(v, "errorInfo")
+    if type(ei) = "roAssociativeArray" then logLine("   errorInfo: " + maskUrl(dumpAA(ei)))
+    url = ""
+    if v.content <> invalid then url = v.content.url
+    logLine("   videoFormat=" + toS(fldOf(v, "videoFormat")) + "  audioFormat=" + toS(fldOf(v, "audioFormat")) + "  url=" + maskUrl(url))
+end sub
+
+' a few seconds after a movie starts: warn when the Roku found no playable audio
+sub onAudioCheck()
+    if not m.vodPlaying then return
+    af = toS(fldOf(m.video, "audioFormat"))
+    vf = toS(fldOf(m.video, "videoFormat"))
+    logLine("audio check: video=" + vf + "  audio=" + af + "  provider says audio=" + toS(m.vod.ainfo))
+    if af = "none" then
+        msg = "No sound: the Roku cannot play this file's audio format"
+        if toS(m.vod.ainfo) <> "" then msg = msg + " (" + toS(m.vod.ainfo) + ")"
+        showStatus(msg, 8)
     end if
 end sub

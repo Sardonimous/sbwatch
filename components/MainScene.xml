@@ -11,6 +11,7 @@
     <script type="text/brightscript" uri="pkg:/components/Favorites.brs" />
     <script type="text/brightscript" uri="pkg:/components/Vod.brs" />
     <script type="text/brightscript" uri="pkg:/components/Player.brs" />
+    <script type="text/brightscript" uri="pkg:/components/Sort.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
 
     <children>
@@ -64,8 +65,9 @@
             <Label id="detTitle" translation="[560,120]" width="1260" height="110" wrap="true" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
             <Label id="detMeta" translation="[560,240]" width="1260" font="font:SmallSystemFont" color="0x60A5FAFF" />
             <Label id="detPlot" translation="[560,290]" width="1260" height="330" wrap="true" font="font:SmallSystemFont" color="0xC8D1DCFF" />
-            <Label id="detCast" translation="[560,630]" width="1260" height="90" wrap="true" font="font:SmallestSystemFont" color="0x8A97A6FF" />
-            <LabelList id="detActions" translation="[560,750]" itemSize="[620,56]" numRows="3"
+            <Label id="detCast" translation="[560,620]" width="1260" height="70" wrap="true" font="font:SmallestSystemFont" color="0x8A97A6FF" />
+            <Label id="detTech" translation="[560,694]" width="1260" height="52" wrap="true" font="font:SmallestSystemFont" color="0x8A97A6FF" />
+            <LabelList id="detActions" translation="[560,750]" itemSize="[620,56]" numRows="4"
                        vertFocusAnimationStyle="floatingFocus" color="0xC8D1DCFF" focusedColor="0xFFFFFFFF" />
             <Label id="detHint" translation="[60,1005]" width="1800" color="0x8A97A6FF" text="OK: select     Up / Down: choose     Back: close" />
         </Group>
@@ -74,7 +76,8 @@
             <Rectangle translation="[0,840]" width="1920" height="240" color="0x000000B8" />
             <Poster id="ovLogo" translation="[80,878]" width="88" height="48" visible="false" loadDisplayMode="scaleToFit" loadWidth="176" loadHeight="96" />
             <Label id="ovName" translation="[184,870]" width="1656" height="56" vertAlign="bottom" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
-            <Label id="ovEpg" translation="[80,950]" width="1760" height="100" wrap="true" font="font:MediumSystemFont" color="0xE0E6EDFF" />
+            <Label id="ovHelp" translation="[80,1042]" width="1760" height="30" visible="false" font="font:SmallestSystemFont" color="0x60A5FAFF" />
+            <Label id="ovEpg" translation="[80,950]" width="1760" height="82" wrap="true" font="font:MediumSystemFont" color="0xE0E6EDFF" />
         </Group>
 
         <Group id="nerd" visible="false">
@@ -94,6 +97,7 @@
         <Timer id="ovTimer" duration="5" repeat="false" />
         <Timer id="statusTimer" duration="3" repeat="false" />
         <Timer id="nerdTimer" duration="1" repeat="true" />
+        <Timer id="audioCheckTimer" duration="4" repeat="false" />
         <Timer id="resumeTimer" duration="15" repeat="true" />
         <Timer id="nerdHideTimer" duration="15" repeat="false" />
         <Timer id="favTimer" duration="0.25" repeat="false" />

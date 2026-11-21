@@ -89,11 +89,11 @@ sub parseList(json as Object, kind as String)
                 else if kind = "series" then
                     nm = toS(s.name)
                     if nm = "" then nm = "Series"
-                    items.push({ id: toS(s.series_id), title: nm, HDPosterUrl: toS(s.cover), rating: toS(s.rating) })
+                    items.push({ id: toS(s.series_id), title: nm, HDPosterUrl: toS(s.cover), rating: toS(s.rating), added: Int(Val(toS(s.last_modified))), year: yearOf(s) })
                 else
                     nm = toS(s.name)
                     if nm = "" then nm = "Channel"
-                    items.push({ id: toS(s.stream_id), title: nm, HDPosterUrl: toS(s.stream_icon), rating: toS(s.rating) })
+                    items.push({ id: toS(s.stream_id), title: nm, HDPosterUrl: toS(s.stream_icon), rating: toS(s.rating), added: Int(Val(toS(s.added))), year: yearOf(s) })
                 end if
             end if
         end for
@@ -139,10 +139,12 @@ end function
 
 ' get_vod_info -> { name, plot, cast, director, genre, year, rating, dur, ext, image }
 sub parseVodInfo(json as Object)
-    d = { name: "", plot: "", cast: "", director: "", genre: "", year: "", rating: "", dur: 0, ext: "", image: "" }
+    d = { name: "", plot: "", cast: "", director: "", genre: "", year: "", rating: "", dur: 0, ext: "", image: "", vinfo: "", ainfo: "" }
     if type(json) = "roAssociativeArray" then
         inf = json.info
         if type(inf) = "roAssociativeArray" then
+            d.vinfo = codecDesc(inf.video)
+            d.ainfo = codecDesc(inf.audio)
             d.plot = firstS(inf, ["plot", "description", "overview"])
             d.cast = firstS(inf, ["cast", "actors"])
             d.director = firstS(inf, ["director"])
@@ -215,13 +217,17 @@ sub parseSeriesInfo(json as Object)
                     plot = ""
                     image = ""
                     dur = 0
+                    vinfo = ""
+                    ainfo = ""
                     ei = ep.info
                     if type(ei) = "roAssociativeArray" then
+                        vinfo = codecDesc(ei.video)
+                        ainfo = codecDesc(ei.audio)
                         plot = firstS(ei, ["plot", "description"])
                         image = firstS(ei, ["movie_image", "cover_big"])
                         dur = infoDur(ei)
                     end if
-                    out.push({ id: toS(ep.id), num: Int(Val(toS(ep.episode_num))), title: toS(ep.title), ext: toS(ep.container_extension), dur: dur, plot: plot, image: image })
+                    out.push({ id: toS(ep.id), num: Int(Val(toS(ep.episode_num))), title: toS(ep.title), ext: toS(ep.container_extension), dur: dur, plot: plot, image: image, vinfo: vinfo, ainfo: ainfo })
                 end if
             end for
             sortByNum(out)
@@ -232,3 +238,30 @@ sub parseSeriesInfo(json as Object)
     end for
     m.top.data = d
 end sub
+
+' "hevc 1920x1080" / "dts 5.1(side)" from the provider's ffprobe data, if it has any
+function codecDesc(o as Object) as String
+    if type(o) <> "roAssociativeArray" then return ""
+    c = firstS(o, ["codec_name", "codec"])
+    if c = "" then return ""
+    out = c
+    w = firstS(o, ["width"])
+    h = firstS(o, ["height"])
+    if w <> "" and w <> "0" and h <> "" and h <> "0" then out = out + " " + w + "x" + h
+    lay = firstS(o, ["channel_layout"])
+    if lay <> "" then
+        out = out + " " + lay
+    else
+        chn = firstS(o, ["channels"])
+        if chn <> "" and chn <> "0" then out = out + " " + chn + "ch"
+    end if
+    return out
+end function
+
+function yearOf(s as Object) as String
+    y = firstS(s, ["year", "releaseDate", "release_date", "releasedate"])
+    if Len(y) >= 4 then y = Left(y, 4)
+    n = Int(Val(y))
+    if n >= 1880 and n <= 2100 then return y
+    return ""
+end function

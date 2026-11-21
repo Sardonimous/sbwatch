@@ -50,7 +50,7 @@ sub showFavMenu()
     end if
 
     dlg = CreateObject("roSGNode", "StandardMessageDialog")
-    dlg.title = chanName(item)
+    dlg.title = dlgTitle(chanName(item), "Favorites")
     dlg.message = ["Favorites"]
     dlg.buttons = ["Move (Up/Down, then OK)", "Move to top", "Remove from favorites", "Cancel"]
     dlg.observeField("buttonSelected", "onFavMenu")

@@ -7,7 +7,7 @@ An Xtream Codes live-TV client for Roku (BrightScript / SceneGraph), built for p
 SBWatch is only a player. You supply your own Xtream provider; no content or credentials are included in this repository.
 
 ## Features
-- **Movies and Series with resume.** Switch between Live TV, Movies and Series from the first row of the category list ("Browse: ..."). Movies open a detail screen (poster, plot, rating, cast) with Play / Resume / Start over; Series open into seasons and episodes, and the next episode plays automatically. Progress is saved every 15 seconds and when you stop, a "Continue Watching" list shows what you left part-way, and titles with saved progress are marked "(resume 34:10)". Search, the category filter and the index work in each mode.
+- **Movies and Series with resume.** Switch between Live TV, Movies and Series from the first row of the category list ("Browse: ..."). Movies open a detail screen (poster, plot, rating, cast, and the provider's video / audio format when it has one - with a warning for audio the Roku cannot play) with Play / Resume / Start over / Add or remove favorite; Series open into seasons and episodes, and the next episode plays automatically. Progress is saved every 15 seconds and when you stop, a "Continue Watching" list shows what you left part-way, and titles with saved progress are marked "(resume 34:10)". Search, the category filter and the index work in each mode.
 - Xtream login (server URL, username, password), saved on the Roku
 - Categories with a name filter; channels load per category, so 30,000-channel providers stay within Roku memory limits
 - A gold star marks channels that are in your Favorites (on every list except Favorites itself, and in the guide)
@@ -44,7 +44,7 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Favorites list | `*` | menu: Move (Up/Down, OK to drop, Back to cancel), Move to top, Remove |
 | Channel list | Replay | open the full guide |
 | Guide | Left/Right, Up/Down | program / channel; OK watch; Rewind/FF page; Replay = now; `*` favorite; Back close |
-| Watching (any mode) | OK | first press: info screen (hides after 15 s); second press: playback options |
+| Watching (any mode) | OK | first press: info banner with a help line; second press (while the help is showing): playback options (guide, stream info, favorite, audio track, ...) |
 | Watching (any mode) | Play/Pause | pause / resume |
 | Watching (any mode) | A | add / remove favorite (an episode favorites its series) |
 | Watching (any mode) | B | closed captions on / off |
@@ -54,9 +54,16 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Watching Movies / Series | Left / Right, Rewind / Fast-forward, Replay | seek 10 s, 60 s, back 10 s |
 | Watching Series | Up / Down | previous / next episode (from an episode list) |
 | Any list | A | add / remove favorite |
+| Channel, movie and series lists | B | cycle the sort order (temporary - never saved) |
 | Recently Watched, Continue Watching | `*` | remove this item / clear the list |
 
 Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Press **B** to turn captions on or off; the Replay menu item **Caption channel** cycles CC1 -> CC2 -> CC3 -> CC4. (You can also use Roku's Settings > Accessibility > Captions.) DVB / teletext subtitles are not supported by the Roku player.
+
+## Sorting
+Press **B** on a channel, movie or series list to cycle through the orders that apply, ending with "Original order". It is temporary: opening a list again restores the provider's order. Available orders: Title A-Z / Z-A (always); Newest / oldest added (series: recently updated), when the provider supplies dates; Highest / lowest rated and Newest / oldest year (movies and series), when the provider supplies them.
+
+## Debug log
+Errors are echoed to the Roku debug console (`telnet ROKU_IP 8085`) with a time stamp: playback errors with the full error code / message / info, the video and audio formats and the (masked) stream URL, API failures, and a "no sound" check a few seconds after a movie starts. Every video state change is logged too.
 
 ## Movies and Series notes
 - Everything saved on the Roku shares its 32 KB registry: Live favorites (about 70), Movie favorites and Series favorites (about 40 each), Recently Watched (10) and resume points (newest 30). A resume point is saved after 30 seconds of viewing and cleared when you finish (95% watched).

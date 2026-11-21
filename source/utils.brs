@@ -531,3 +531,45 @@ sub setRtl(lbl as Object, text as String, latFont as Dynamic, size as Integer, w
         lbl.text = text
     end if
 end sub
+
+' ---------------------------------------------------------------------
+' Debug log, and text the Roku itself draws (it has no Arabic glyphs)
+' ---------------------------------------------------------------------
+
+sub logLine(text as String)
+    dt = CreateObject("roDateTime")
+    dt.ToLocalTime()
+    ts = Right("0" + dt.GetHours().ToStr(), 2) + ":" + Right("0" + dt.GetMinutes().ToStr(), 2) + ":" + Right("0" + dt.GetSeconds().ToStr(), 2)
+    print "SBWatch "; ts; "  "; text
+end sub
+
+function looksLikeError(t as String) as Boolean
+    l = LCase(t)
+    if Instr(1, l, "error") > 0 then return true
+    if Instr(1, l, "could not") > 0 then return true
+    if Instr(1, l, "failed") > 0 then return true
+    if Instr(1, l, "rejected") > 0 then return true
+    if Instr(1, l, "unavailable") > 0 then return true
+    if Instr(1, l, "no sound") > 0 then return true
+    return false
+end function
+
+' dialog titles and the video player's own title bar use Roku's system font:
+' keep Arabic titles out of them
+function dlgTitle(t as String, fallback as String) as String
+    if hasArabic(t) then return fallback
+    return t
+end function
+
+function nodeTitle(t as String) as String
+    if hasArabic(t) then return ""
+    return t
+end function
+
+function audioWarn(a as String) as String
+    l = LCase(a)
+    if Instr(1, l, "dts") > 0 or Instr(1, l, "dca") > 0 or Instr(1, l, "truehd") > 0 or Instr(1, l, "mlp") > 0 then
+        return "The Roku cannot play " + a + " audio, so this title will probably have no sound."
+    end if
+    return ""
+end function
