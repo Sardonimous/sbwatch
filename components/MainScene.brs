@@ -685,6 +685,7 @@ end sub
 
 sub onVideoState()
     logLine("video state: " + m.video.state)
+    if not m.vodPlaying and not m.video.visible then return
     if m.vodPlaying then
         onVodState()
         return

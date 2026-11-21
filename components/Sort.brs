@@ -81,7 +81,7 @@ sub cycleSort()
     m.sortCur = node
     m.chList.content = node
     m.chList.jumpToItem = 0
-    showStatus("Sorted: " + opt.label + "     (B: next order - not saved)", 4)
+    showStatus("Sorted: " + opt.label, 4)
 end sub
 
 function buildSorted(base as Object, opt as Object) as Object

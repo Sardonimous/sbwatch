@@ -20,6 +20,7 @@ sub vodInit()
     m.detActs = []
     m.vodPlaying = false
     m.vodStarted = false
+    m.vodFailed = false
     m.vod = invalid
     m.seriesData = invalid
     m.pendingItem = invalid
@@ -655,6 +656,7 @@ sub startVod(d as Object, startAt as Integer)
     m.vod = d
     m.vodPlaying = true
     m.vodStarted = false
+    m.vodFailed = false
     seg = "movie"
     if d.kind = "episode" then seg = "series"
     url = m.server + "/" + seg + "/" + urlEnc(m.user) + "/" + urlEnc(m.pass) + "/" + d.id + "." + d.ext
@@ -693,10 +695,16 @@ sub onVodState()
         m.audioCheckTimer.control = "stop"
         m.audioCheckTimer.control = "start"
     else if st = "finished" then
+        if m.vodFailed or not m.vodStarted then return
         onVodFinished()
     else if st = "error" then
+        ' stop here (never go on to the next episode) and keep the message up
+        m.vodFailed = true
         logVideoError("vod " + m.vod.ext)
-        showStatus("Playback error: " + m.video.errorMsg + "  (code " + toS(fldOf(m.video, "errorCode")) + ", Back to return)", 0)
+        msg = vodErrorText()
+        stopPlayback()
+        showPendingResults()
+        showStatus(msg, 12)
     end if
 end sub
 
@@ -868,3 +876,18 @@ sub onItemMenu(event as Object)
         showStatus("List cleared", 2)
     end if
 end sub
+
+' plain-language text for a failed movie / episode (full details are in the debug log)
+function vodErrorText() as String
+    v = m.video
+    txt = toS(fldOf(v, "errorStr"))
+    ei = fldOf(v, "errorInfo")
+    if type(ei) = "roAssociativeArray" then txt = txt + " " + toS(ei.dbgmsg)
+    code = 0
+    p = Instr(1, txt, "response code:(")
+    if p > 0 then code = Int(Val(Mid(txt, p + 15, 5)))
+    if code = 403 then return "Playback error: the provider refused this file (HTTP 403). It may have been removed or blocked, or your account may be over its connection limit."
+    if code = 404 then return "Playback error: the file was not found on the provider (HTTP 404)."
+    if code > 0 then return "Playback error: the provider returned HTTP " + code.ToStr() + " for this file."
+    return "Playback error: " + toS(fldOf(v, "errorMsg")) + "  (code " + toS(fldOf(v, "errorCode")) + ")"
+end function
