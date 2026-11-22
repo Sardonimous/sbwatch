@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="CategoryItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="itemHasFocus" type="boolean" onChange="onFocus" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/CategoryItem.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <children>
+        <ScrollingLabel id="name" translation="[14,0]" maxWidth="492" height="56" vertAlign="center"
+                        repeatCount="0" scrollSpeed="110" color="0xC8D1DCFF" />
+    </children>
+</component>

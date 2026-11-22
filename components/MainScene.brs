@@ -39,6 +39,7 @@ sub init()
     m.nerdHideTimer.observeField("fire", "onNerdHide")
     m.prevChan = invalid
     m.playingName = ""
+    m.pendingRecent = invalid
     m.capChan = 1
 
     m.catList.observeField("itemSelected", "onCatSelected")
@@ -439,6 +440,10 @@ sub onChFocused()
 end sub
 
 sub onChSelected(event as Object)
+    if m.nextPending <> invalid then
+        playNextNow()
+        return
+    end if
     if m.guideOpen then
         idx = event.getData()
         closeGuide()
@@ -649,7 +654,7 @@ sub playChannel(index as Integer)
         requestEpg(item.id)
     end if
 
-    addRecent(item.id, chanName(item), m.playingIcon)
+    m.pendingRecent = { id: item.id, title: chanName(item), icon: m.playingIcon }
     startStream(item.id, "m3u8")
     showOverlay()
     ' keep focus on the (hidden) channel list: Up/Down then arrive as
@@ -695,6 +700,7 @@ sub onVideoState()
         showStatus("Buffering ...", 0)
     else if st = "playing" then
         hideStatus()
+        flushRecent()
     else if st = "error" then
         logVideoError("live " + m.curExt)
         if m.curExt = "m3u8" and not m.triedTs then
@@ -709,6 +715,8 @@ sub onVideoState()
 end sub
 
 sub stopPlayback()
+    cancelNext()
+    m.pendingRecent = invalid
     wasVod = m.vodPlaying
     if wasVod then
         saveVodProgress()
@@ -1026,7 +1034,7 @@ end sub
 
 sub showStatus(text as String, seconds as Integer)
     if looksLikeError(text) then logLine("STATUS: " + text)
-    m.status.text = text
+    setRtl(m.status, text, "font:MediumSystemFont", 28, 0)
     y = 930
     if m.video.visible and not m.guideOpen then y = 745
     m.statusBar.translation = [0, y]
@@ -1059,6 +1067,16 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.detailOpen then
         if key = "back" then closeDetail()
+        return true
+    end if
+
+    if m.nextPending <> invalid then
+        if key = "back" then
+            stopPlayback()
+            showPendingResults()
+        else if key = "play" then
+            playNextNow()
+        end if
         return true
     end if
 
@@ -1244,7 +1262,7 @@ sub playDirect(id as String, name as String, icon as String)
         requestEpg(id)
     end if
 
-    addRecent(id, name, icon)
+    m.pendingRecent = { id: id, title: name, icon: icon }
     startStream(id, "m3u8")
     showOverlay()
 
@@ -1268,3 +1286,11 @@ function isKnownKey(key as String) as Boolean
     end for
     return false
 end function
+
+' a channel joins Recently Watched once it has really started playing
+sub flushRecent()
+    p = m.pendingRecent
+    if p = invalid then return
+    m.pendingRecent = invalid
+    addRecent(p.id, p.title, p.icon)
+end sub

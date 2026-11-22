@@ -9,9 +9,8 @@
     <children>
         <Poster id="logo" translation="[10,10]" width="64" height="36" visible="false"
                 loadDisplayMode="scaleToFit" loadWidth="128" loadHeight="72" />
-        <Label id="name" translation="[90,0]" width="580" height="56" vertAlign="center" color="0xC8D1DCFF">
-            <Font role="font" uri="font:SystemFontFile" size="30" />
-        </Label>
+        <ScrollingLabel id="name" translation="[90,0]" maxWidth="580" height="56" vertAlign="center"
+                        repeatCount="0" scrollSpeed="110" color="0xC8D1DCFF" />
         <Poster id="star" uri="pkg:/images/star.png" translation="[682,14]" width="28" height="28" visible="false"
                 loadDisplayMode="scaleToFit" />
     </children>

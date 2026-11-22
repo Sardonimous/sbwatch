@@ -7,7 +7,7 @@ An Xtream Codes live-TV client for Roku (BrightScript / SceneGraph), built for p
 SBWatch is only a player. You supply your own Xtream provider; no content or credentials are included in this repository.
 
 ## Features
-- **Movies and Series with resume.** Switch between Live TV, Movies and Series from the first row of the category list ("Browse: ..."). Movies open a detail screen (poster, plot, rating, cast, and the provider's video / audio format when it has one - with a warning for audio the Roku cannot play) with Play / Resume / Start over / Add or remove favorite; Series open into seasons and episodes, and the next episode plays automatically. Progress is saved every 15 seconds and when you stop, a "Continue Watching" list shows what you left part-way, and titles with saved progress are marked "(resume 34:10)". Search, the category filter and the index work in each mode.
+- **Movies and Series with resume.** Switch between Live TV, Movies and Series from the first row of the category list ("Browse: ..."). Movies open a detail screen (poster, plot, rating, cast, and the provider's video / audio format when it has one - with a warning for audio the Roku cannot play) with Play / Resume / Start over / Add or remove favorite; Series open into seasons and episodes; when an episode ends, a 10-second countdown (OK: play now, Back: stop) precedes the next one. Progress is saved every 15 seconds and when you stop, Recently Watched only records a channel once it has really started playing. A "Continue Watching" list shows what you left part-way, and titles with saved progress are marked "(resume 34:10)". Search, the category filter and the index work in each mode.
 - Xtream login (server URL, username, password), saved on the Roku
 - Categories with a name filter; channels load per category, so 30,000-channel providers stay within Roku memory limits
 - A gold star marks channels that are in your Favorites (on every list except Favorites itself, and in the guide)
@@ -59,8 +59,14 @@ Credentials are stored in the Roku registry on the device, never in the package.
 
 Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Press **B** to turn captions on or off; the Replay menu item **Caption channel** cycles CC1 -> CC2 -> CC3 -> CC4. (You can also use Roku's Settings > Accessibility > Captions.) DVB / teletext subtitles are not supported by the Roku player.
 
+## Long names scroll
+In the category and channel / movie / series lists, a name that does not fit is shown with "..." and scrolls sideways while its row is highlighted.
+
 ## Sorting
 Press **B** on a channel, movie or series list to cycle through the orders that apply, ending with "Original order". It is temporary: opening a list again restores the provider's order. Available orders: Title A-Z / Z-A (always); Newest / oldest added (series: recently updated), when the provider supplies dates; Highest / lowest rated and Newest / oldest year (movies and series), when the provider supplies them.
+
+## Releasing
+Releases are made from tags. `tools/release-notes.sh` prints notes for everything committed since the last tag (each commit's subject and description). `tools/release.sh` does the whole release: it builds the zip, writes the notes, tags the commit as `v<major>.<minor>.<build>` (from the manifest), pushes, and creates the GitHub release with the zip attached. It needs the GitHub CLI (`gh auth login` once). Bump the version in `manifest` and commit first. Plain git can do the tag and the notes (`git tag -a`, `git log`); creating the release itself on GitHub is what `gh release create` adds.
 
 ## Debug log
 Errors are echoed to the Roku debug console (`telnet ROKU_IP 8085`) with a time stamp: playback errors with the full error code / message / info, the video and audio formats and the (masked) stream URL, API failures, and a "no sound" check a few seconds after a movie starts. Every video state change is logged too.

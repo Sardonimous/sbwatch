@@ -21,6 +21,10 @@ sub vodInit()
     m.vodPlaying = false
     m.vodStarted = false
     m.vodFailed = false
+    m.nextPending = invalid
+    m.nextCount = 0
+    m.nextTimer = m.top.findNode("nextTimer")
+    m.nextTimer.observeField("fire", "onNextTimer")
     m.vod = invalid
     m.seriesData = invalid
     m.pendingItem = invalid
@@ -653,6 +657,7 @@ end sub
 ' ---------------------------------------------------------------------
 
 sub startVod(d as Object, startAt as Integer)
+    cancelNext()
     m.vod = d
     m.vodPlaying = true
     m.vodStarted = false
@@ -715,12 +720,11 @@ sub onVodFinished()
         return
     end if
     removeResume(d.key)
+    m.vodStarted = false
     nxt = nextEpisode(d)
     if nxt <> invalid then
-        showStatus("Next episode ...", 3)
-        startVod(nxt, 0)
+        beginNextCountdown(nxt)
     else
-        m.vodStarted = false
         stopPlayback()
         showPendingResults()
     end if
@@ -766,6 +770,7 @@ sub syncVodList(d as Object)
 end sub
 
 sub vodListFocused()
+    if m.nextPending <> invalid then cancelNext()
     idx = m.chList.itemFocused
     if m.listKind <> "episodes" then
         ' movies: the hidden list must not wander while watching
@@ -891,3 +896,46 @@ function vodErrorText() as String
     if code > 0 then return "Playback error: the provider returned HTTP " + code.ToStr() + " for this file."
     return "Playback error: " + toS(fldOf(v, "errorMsg")) + "  (code " + toS(fldOf(v, "errorCode")) + ")"
 end function
+
+' ---------------------------------------------------------------------
+' Pause between episodes: a 10 second countdown before the next one starts
+' (OK / Play = start now, Back = stop)
+' ---------------------------------------------------------------------
+
+sub beginNextCountdown(nxt as Object)
+    m.nextPending = nxt
+    m.nextCount = 10
+    m.nextTimer.control = "stop"
+    m.nextTimer.control = "start"
+    showNextStatus()
+end sub
+
+sub showNextStatus()
+    if m.nextPending = invalid then return
+    showStatus("Next episode in " + m.nextCount.ToStr() + " s:  " + m.nextPending.title + "        OK: play now        Back: stop", 0)
+end sub
+
+sub onNextTimer()
+    if m.nextPending = invalid then
+        m.nextTimer.control = "stop"
+        return
+    end if
+    m.nextCount = m.nextCount - 1
+    if m.nextCount <= 0 then
+        playNextNow()
+    else
+        showNextStatus()
+    end if
+end sub
+
+sub playNextNow()
+    nxt = m.nextPending
+    if nxt = invalid then return
+    cancelNext()
+    startVod(nxt, 0)
+end sub
+
+sub cancelNext()
+    m.nextPending = invalid
+    if m.nextTimer <> invalid then m.nextTimer.control = "stop"
+end sub

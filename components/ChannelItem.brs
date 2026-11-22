@@ -1,7 +1,11 @@
 sub init()
     m.logo = m.top.findNode("logo")
     m.name = m.top.findNode("name")
-    m.latFont = m.name.font
+    f = CreateObject("roSGNode", "Font")
+    f.uri = "font:SystemFontFile"
+    f.size = 30
+    m.latFont = f
+    m.name.font = f
     m.star = m.top.findNode("star")
     m.global.observeField("favIds", "refreshStar")
     m.global.observeField("showFavStars", "refreshStar")
@@ -33,7 +37,9 @@ end sub
 sub onFocus()
     if m.top.itemHasFocus then
         m.name.color = "0xFFFFFFFF"
+        m.name.repeatCount = -1
     else
         m.name.color = "0xC8D1DCFF"
+        m.name.repeatCount = 0
     end if
 end sub
