@@ -73,6 +73,10 @@ end sub
 
 ' First OK shows the info screen, the next OK opens the playback options.
 sub playerOk()
+    if m.nerd.visible then
+        toggleNerd()
+        return
+    end if
     if m.okPrompt then
         m.okPrompt = false
         m.ovHelp.visible = false
@@ -198,10 +202,10 @@ sub showPlayMenu()
         m.menuActs.push("guide")
     end if
 
-    infoLbl = "Show stream info"
-    if m.nerd.visible then infoLbl = "Hide stream info"
-    labels.push(infoLbl)
-    m.menuActs.push("info")
+    if not m.nerd.visible then
+        labels.push("Show stream info")
+        m.menuActs.push("info")
+    end if
 
     favLbl = "Add to favorites"
     if isFavPlaying() then favLbl = "Remove from favorites"

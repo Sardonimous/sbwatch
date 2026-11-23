@@ -706,7 +706,7 @@ sub onVodState()
         ' stop here (never go on to the next episode) and keep the message up
         m.vodFailed = true
         logVideoError("vod " + m.vod.ext)
-        msg = vodErrorText()
+        msg = playbackErrorText()
         stopPlayback()
         showPendingResults()
         showStatus(msg, 12)
@@ -883,7 +883,7 @@ sub onItemMenu(event as Object)
 end sub
 
 ' plain-language text for a failed movie / episode (full details are in the debug log)
-function vodErrorText() as String
+function playbackErrorText() as String
     v = m.video
     txt = toS(fldOf(v, "errorStr"))
     ei = fldOf(v, "errorInfo")
@@ -894,6 +894,15 @@ function vodErrorText() as String
     if code = 403 then return "Playback error: the provider refused this file (HTTP 403). It may have been removed or blocked, or your account may be over its connection limit."
     if code = 404 then return "Playback error: the file was not found on the provider (HTTP 404)."
     if code > 0 then return "Playback error: the provider returned HTTP " + code.ToStr() + " for this file."
+    ' the Roku's own decoder rejected the stream, e.g. "Unsupported AAC stream"
+    u = Instr(1, txt, "Unsupported")
+    if u > 0 then
+        q = Instr(u, txt, ":")
+        piece = Mid(txt, u)
+        if q > u then piece = Mid(txt, u, q - u)
+        if Right(piece, 1) = "." then piece = Left(piece, Len(piece) - 1)
+        return "Playback error: the Roku cannot play this stream (" + piece + "). Its built-in decoder does not support this format."
+    end if
     return "Playback error: " + toS(fldOf(v, "errorMsg")) + "  (code " + toS(fldOf(v, "errorCode")) + ")"
 end function
 
@@ -939,3 +948,9 @@ sub cancelNext()
     m.nextPending = invalid
     if m.nextTimer <> invalid then m.nextTimer.control = "stop"
 end sub
+
+' how many favorites each list may hold (the Roku registry is only 32 KB)
+function favCap() as Integer
+    if m.mode = "live" then return 75
+    return 40
+end function

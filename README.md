@@ -44,7 +44,7 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Favorites list | `*` | menu: Move (Up/Down, OK to drop, Back to cancel), Move to top, Remove |
 | Channel list | Replay | open the full guide |
 | Guide | Left/Right, Up/Down | program / channel; OK watch; Rewind/FF page; Replay = now; `*` favorite; Back close |
-| Watching (any mode) | OK | first press: info banner with a help line; second press (while the help is showing): playback options (guide, stream info, favorite, audio track, ...) |
+| Watching (any mode) | OK | first press: info banner with a help line; second press (while the help is showing): playback options (guide, stream info, favorite, audio track, ...). OK also hides the stream info screen |
 | Watching (any mode) | Play/Pause | pause / resume |
 | Watching (any mode) | A | add / remove favorite (an episode favorites its series) |
 | Watching (any mode) | B | closed captions on / off |
@@ -59,6 +59,13 @@ Credentials are stored in the Roku registry on the device, never in the package.
 
 Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Press **B** to turn captions on or off; the Replay menu item **Caption channel** cycles CC1 -> CC2 -> CC3 -> CC4. (You can also use Roku's Settings > Accessibility > Captions.) DVB / teletext subtitles are not supported by the Roku player.
 
+## Voice search
+The search and filter boxes use Roku's full-word voice entry (hold the microphone button on the voice remote while the keyboard is showing and say the words). Roku's voice entry currently understands English and Spanish only, so Arabic searches must be typed.
+
+## Not available on Roku
+- The remote's streaming-service shortcut buttons (the "partner" buttons) are handled by the Roku system and are never sent to apps, so apps cannot use or block them. On remotes with programmable buttons they are assigned in the Roku settings.
+- Roku's built-in player decodes a fixed list of audio / video formats. A stream it cannot decode (for example "Unsupported AAC stream") cannot be played by an app; other players ship their own software decoders.
+
 ## Long names scroll
 In the category and channel / movie / series lists, a name that does not fit is shown with "..." and scrolls sideways while its row is highlighted.
 
@@ -72,7 +79,7 @@ Releases are made from tags. `tools/release-notes.sh` prints notes for everythin
 Errors are echoed to the Roku debug console (`telnet ROKU_IP 8085`) with a time stamp: playback errors with the full error code / message / info, the video and audio formats and the (masked) stream URL, API failures, and a "no sound" check a few seconds after a movie starts. Every video state change is logged too.
 
 ## Movies and Series notes
-- Everything saved on the Roku shares its 32 KB registry: Live favorites (about 70), Movie favorites and Series favorites (about 40 each), Recently Watched (10) and resume points (newest 30). A resume point is saved after 30 seconds of viewing and cleared when you finish (95% watched).
+- Everything saved on the Roku shares its 32 KB registry: Live favorites (75), Movie favorites and Series favorites (40 each), Recently Watched (20) and resume points (newest 30). A resume point is saved after 30 seconds of viewing and cleared when you finish (95% watched).
 - Playback uses the Roku player's own controls: OK pause / play, Left / Right and Rewind / Fast-forward to seek, `*` for audio and subtitle choices, Back to stop. B turns captions on / off.
 - Favorites exist separately for Live TV, Movies and Series (a series is favorited as a whole). Recently Watched and the program guide are for Live TV only. Resume data is cleared if you change provider.
 - Playback options include **Audio track** when a file has several audio tracks - useful when a movie plays without sound (the info screen lists each track and codec; the Roku cannot decode every audio format, e.g. DTS).

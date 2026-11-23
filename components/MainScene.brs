@@ -302,6 +302,7 @@ sub openFilterDialog()
     dlg.title = "Filter categories"
     dlg.message = ["Words match anywhere in the name. Example: us sports"]
     dlg.text = m.catFilter
+    if dlg.hasField("keyboardDomain") then dlg.keyboardDomain = "generic"
     dlg.buttons = ["Apply", "Clear", "Cancel"]
     dlg.observeField("buttonSelected", "onFilterButton")
     m.fdlg = dlg
@@ -708,7 +709,7 @@ sub onVideoState()
             showStatus("HLS failed, trying MPEG-TS ...", 0)
             startStream(m.playingId, "ts")
         else
-            showStatus("Playback error: " + m.video.errorMsg + "  (code " + toS(fldOf(m.video, "errorCode")) + ", Back to return)", 0)
+            showStatus(playbackErrorText() + "   (Back to return)", 0)
             showOverlay()
         end if
     end if
@@ -935,15 +936,35 @@ function loadList(key as String) as Object
     s = regRead(key)
     if s = "" then return []
     arr = ParseJson(s)
-    if arr = invalid then return []
-    return arr
+    if type(arr) <> "roArray" then return []
+    out = []
+    for each e in arr
+        if type(e) = "roAssociativeArray" then
+            if e.i <> invalid then
+                out.push({ id: toS(e.i), title: toS(e.t), icon: toS(e.c) })
+            else
+                out.push(e)
+            end if
+        end if
+    end for
+    return out
 end function
 
 function saveList(key as String, arr as Object) as Boolean
-    s = FormatJson(arr)
-    lim = 6000
-    if key = "favs" then lim = 10000
-    if key = "recents" then lim = 1500
+    ' short key names (i / t / c) keep each entry small; loadList reads both forms
+    packed = []
+    for each e in arr
+        p = { i: e.id, t: e.title }
+        ic = e.icon
+        if ic <> invalid then
+            if ic <> "" then p.c = ic
+        end if
+        packed.push(p)
+    end for
+    s = FormatJson(packed)
+    lim = 5200
+    if key = "favs" then lim = 11000
+    if key = "recents" then lim = 3200
     if Len(s) > lim then return false
     regWrite(key, s)
     return true
@@ -972,7 +993,7 @@ sub addRecent(id as String, title as String, icon as String)
     rec = loadList("recents")
     out = [{ id: id, title: title, icon: icon }]
     for each e in rec
-        if e.id <> id and out.Count() < 10 then out.push(e)
+        if e.id <> id and out.Count() < 20 then out.push(e)
     end for
     saveList("recents", out)
 end sub
@@ -990,6 +1011,10 @@ sub toggleFav(id as String, title as String, iconIn as Dynamic)
         favs.Delete(found)
         note = "Removed from favorites"
     else
+        if favs.Count() >= favCap() then
+            showStatus("Favorites list is full (maximum " + favCap().ToStr() + ") - remove one first", 4)
+            return
+        end if
         favs.push({ id: id, title: title, icon: icon })
         note = "Added to favorites"
     end if
