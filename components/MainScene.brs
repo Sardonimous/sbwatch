@@ -302,11 +302,12 @@ sub openFilterDialog()
     dlg.title = "Filter categories"
     dlg.message = ["Words match anywhere in the name. Example: us sports"]
     dlg.text = m.catFilter
-    if dlg.hasField("keyboardDomain") then dlg.keyboardDomain = "generic"
+    setVoiceGeneric(dlg, "filter")
     dlg.buttons = ["Apply", "Clear", "Cancel"]
     dlg.observeField("buttonSelected", "onFilterButton")
     m.fdlg = dlg
     m.top.dialog = dlg
+    setVoiceGeneric(dlg, "filter, shown")
 end sub
 
 sub onFilterButton(event as Object)

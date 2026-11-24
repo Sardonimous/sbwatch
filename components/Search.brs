@@ -145,7 +145,7 @@ sub openSearchDialog()
     dlg.title = "Search"
     if m.mode <> "live" then dlg.title = "Search " + modeName()
     dlg.text = m.lastQuery
-    if dlg.hasField("keyboardDomain") then dlg.keyboardDomain = "generic"
+    setVoiceGeneric(dlg, "search")
     if m.mode = "live" then
         dlg.buttons = ["Search channels", "Search program guide (current channel list)", "Rebuild channel search index"]
         m.searchActs = ["chan", "epg", "rebuild"]
@@ -157,6 +157,7 @@ sub openSearchDialog()
     dlg.observeField("buttonSelected", "onSearchButton")
     m.sdlg = dlg
     m.top.dialog = dlg
+    setVoiceGeneric(dlg, "search, shown")
 end sub
 
 sub onSearchButton(event as Object)

@@ -60,7 +60,7 @@ Credentials are stored in the Roku registry on the device, never in the package.
 Closed captions: SBWatch declares the in-band EIA-608 caption channels (CC1-CC4) to the Roku player, which is what makes the Roku show them (a decoder like ExoPlayer finds them by itself; Roku does not). Press **B** to turn captions on or off; the Replay menu item **Caption channel** cycles CC1 -> CC2 -> CC3 -> CC4. (You can also use Roku's Settings > Accessibility > Captions.) DVB / teletext subtitles are not supported by the Roku player.
 
 ## Voice search
-The search and filter boxes use Roku's full-word voice entry (hold the microphone button on the voice remote while the keyboard is showing and say the words). Roku's voice entry currently understands English and Spanish only, so Arabic searches must be typed.
+The search and filter boxes ask Roku for full-word voice entry (hold the microphone button on the voice remote while the keyboard is showing and say the words); the provider login boxes stay letter-by-letter, which suits passwords and addresses. Two Roku settings control this and both are set (`keyboardDomain` on the dialog and `voiceEntryType` on its inner text box); the debug log says which of them your Roku has. Roku's voice entry currently understands English and Spanish only, so Arabic searches must be typed.
 
 ## Not available on Roku
 - The remote's streaming-service shortcut buttons (the "partner" buttons) are handled by the Roku system and are never sent to apps, so apps cannot use or block them. On remotes with programmable buttons they are assigned in the Roku settings.
@@ -71,6 +71,9 @@ In the category and channel / movie / series lists, a name that does not fit is 
 
 ## Sorting
 Press **B** on a channel, movie or series list to cycle through the orders that apply, ending with "Original order". It is temporary: opening a list again restores the provider's order. Available orders: Title A-Z / Z-A (always); Newest / oldest added (series: recently updated), when the provider supplies dates; Highest / lowest rated and Newest / oldest year (movies and series), when the provider supplies them.
+
+## Making GitHub match this repository
+`tools/sync-to-github.sh` force-pushes this repository's `main` and all tags to the GitHub `origin` so that GitHub is an exact copy (it shows a summary of the differences first and asks you to type `yes`). Releases, issues and the wiki are not git data and are not touched.
 
 ## Releasing
 Releases are made from tags. `tools/release-notes.sh` prints notes for everything committed since the last tag (each commit's subject and description). `tools/release.sh` does the whole release: it builds the zip, writes the notes, tags the commit as `v<major>.<minor>.<build>` (from the manifest), pushes, and creates the GitHub release with the zip attached. It needs the GitHub CLI (`gh auth login` once). Bump the version in `manifest` and commit first. Plain git can do the tag and the notes (`git tag -a`, `git log`); creating the release itself on GitHub is what `gh release create` adds.

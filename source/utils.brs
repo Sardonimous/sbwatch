@@ -573,3 +573,30 @@ function audioWarn(a as String) as String
     end if
     return ""
 end function
+
+' Voice entry: ask a StandardKeyboardDialog for full-word dictation (search boxes).
+' Roku has two settings: the dialog's keyboardDomain and the voiceEntryType of its
+' inner voice text box (a keyboard's inner box can default to letter-by-letter).
+' What exists and what was set is written to the debug log.
+sub setVoiceGeneric(dlg as Object, label as String)
+    info = ""
+    if dlg.hasField("keyboardDomain") then
+        dlg.keyboardDomain = "generic"
+        info = info + "keyboardDomain=" + toS(dlg.keyboardDomain)
+    else
+        info = info + "keyboardDomain=<no such field>"
+    end if
+    tb = fldOf(dlg, "textEditBox")
+    if tb <> invalid then
+        if tb.hasField("voiceEnabled") then tb.voiceEnabled = true
+        if tb.hasField("voiceEntryType") then
+            tb.voiceEntryType = "generic"
+            info = info + "  voiceEntryType=" + toS(tb.voiceEntryType)
+        else
+            info = info + "  voiceEntryType=<no such field>"
+        end if
+    else
+        info = info + "  textEditBox=<not available>"
+    end if
+    logLine("voice entry (" + label + "): " + info)
+end sub
