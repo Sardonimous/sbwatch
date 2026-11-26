@@ -11,6 +11,10 @@
 
 sub playerKey(key as String)
     if key = "back" then
+        if m.nerd.visible then
+            toggleNerd()
+            return
+        end if
         wasVod = m.vodPlaying
         stopPlayback()
         if wasVod then

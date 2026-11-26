@@ -7,6 +7,7 @@
 
 sub favInit()
     m.favMove = invalid
+    m.lastFavRemoved = invalid
     m.favDlg = invalid
     m.favMenuIdx = 0
     m.favTimer = m.top.findNode("favTimer")

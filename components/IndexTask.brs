@@ -1,91 +1,130 @@
-' Builds a compact on-device name index (one line per channel/title):
-'     id <TAB> categoryId <TAB> name <TAB> logoUrl
-' The provider is walked category by category (each retried up to 3 times),
-' the lines are collected in memory, then stored as several small "shard"
-' files that are each read back and verified. Any old index files are wiped
-' first. If the app cache cannot hold the shards reliably, tmp:/ is used.
-' kind: "live" | "vod" | "series"  (vod/series are ready for later)
+' =====================================================================
+' Search index worker. The scene starts several of these at once, each with
+' its own slice of the categories to index.
+'
+' Per category (kind = live | vod | series):
+'   svidx_<kind>_c<cid>_<n>.txt   lines  id <TAB> name [<TAB> logo url (live only)]
+'   svidx_<kind>_c<cid>.ok        marker written last:  time TAB pieces TAB count TAB key TAB volume
+' A category with a valid, recent marker is skipped (unless force), so only
+' missing or old categories are fetched. Data is verified by reading it back;
+' the app cache is tried first, tmp:/ second.
+' =====================================================================
 
 sub init()
     m.top.functionName = "run"
 end sub
 
-function fetchCategory(base as String, cid as String, idField as String, iconField as String) as Dynamic
+function cleanField(s as String, sep as String) as String
+    if Instr(1, s, sep) > 0 then s = s.Replace(sep, " ")
+    if Instr(1, s, Chr(10)) > 0 then s = s.Replace(Chr(10), " ")
+    if Instr(1, s, Chr(13)) > 0 then s = s.Replace(Chr(13), " ")
+    return s
+end function
+
+function fetchCategory(base as String, cid as String, idField as String, iconField as String, withIcon as Boolean) as Dynamic
     sep = Chr(9)
-    body = httpFetch(base + urlEnc(cid), 45000)
+    body = httpFetch(base + urlEnc(cid), 60000)
     if body = invalid then return invalid
     json = ParseJson(body)
     if type(json) <> "roArray" then return invalid
 
-    chunk = ""
+    pieces = []
+    buf = ""
     n = 0
     for each s in json
         if type(s) = "roAssociativeArray" then
             nm = toS(s.name)
             sid = toS(s[idField])
             if nm <> "" and sid <> "" then
-                nm = nm.Replace(sep, " ")
-                nm = nm.Replace(Chr(10), " ")
-                nm = nm.Replace(Chr(13), " ")
-                ic = toS(s[iconField])
-                ic = ic.Replace(sep, "")
-                ic = ic.Replace(Chr(10), "")
-                ic = ic.Replace(Chr(13), "")
-                chunk = chunk + sid + sep + cid + sep + nm + sep + ic + Chr(10)
+                line = sid + sep + cleanField(nm, sep)
+                if withIcon then line = line + sep + cleanField(toS(s[iconField]), sep)
+                buf = buf + line + Chr(10)
                 n = n + 1
+                if Len(buf) > 100000 then
+                    pieces.push(buf)
+                    buf = ""
+                end if
             end if
         end if
     end for
-    return { chunk: chunk, n: n }
+    if buf <> "" then pieces.push(buf)
+    return { pieces: pieces, n: n }
 end function
 
-' Deletes every index file (any generation / format) from both volumes.
-sub cleanIndexFiles()
+' old index formats (single shard files etc.) are deleted
+sub cleanOldIndexFiles()
     for each vol in ["cachefs:/", "tmp:/"]
         names = ListDir(vol)
         if names <> invalid then
             for each nm in names
-                if Left(LCase(nm), 5) = "svidx" then DeleteFile(vol + nm)
+                low = LCase(nm)
+                if Left(low, 5) = "svidx" then
+                    if Instr(7, low, "_c") = 0 then DeleteFile(vol + nm)
+                end if
             end for
         end if
     end for
 end sub
 
-' "cachefs:/ 3 files 120 KB; tmp:/ 0 files 0 KB" - for error messages
-function usageNote() as String
-    fs = CreateObject("roFileSystem")
-    out = ""
-    for each vol in ["cachefs:/", "tmp:/"]
-        names = ListDir(vol)
-        n = 0
-        bytes = 0
-        if names <> invalid then
-            for each nm in names
-                n = n + 1
-                st = fs.Stat(vol + nm)
-                if st <> invalid then
-                    if st.DoesExist("size") then bytes = bytes + Int(Val(toS(st.size)))
-                end if
+function markerFresh(fs as Object, kind as String, cid as String, key as String) as Boolean
+    for each v in ["cachefs:/", "tmp:/"]
+        p = v + "svidx_" + kind + "_c" + fileKey(cid) + ".ok"
+        if fs.Exists(p) then
+            parts = []
+            for each f in ReadAsciiFile(p).Tokenize(Chr(9))
+                parts.push(f)
             end for
+            if parts.Count() >= 5 then
+                if parts[3] = key and nowSecs() - Int(Val(parts[0])) < 259200 then return true
+            end if
         end if
-        out = out + vol + " holds " + n.ToStr() + " files / " + Int(bytes / 1024).ToStr() + " KB;  "
     end for
-    return out
+    return false
 end function
 
-' Writes and verifies every shard on one volume. Returns "" or an error text.
-function writeShards(vol as String, shards as Object, kind as String) as String
-    for i = 0 to shards.Count() - 1
-        p = vol + "svidx_" + kind + "_" + i.ToStr() + ".txt"
-        if not WriteAsciiFile(p, shards[i]) then
-            return "write failed for part " + i.ToStr() + " on " + vol
-        end if
-        back = ReadAsciiFile(p)
-        if back <> shards[i] then
-            return "verify failed for part " + i.ToStr() + " on " + vol + " (wrote " + Len(shards[i]).ToStr() + " chars, read back " + Len(back).ToStr() + ")"
-        end if
+sub deleteCategoryFiles(fs as Object, kind as String, cid as String)
+    base = "svidx_" + kind + "_c" + fileKey(cid)
+    for each v in ["cachefs:/", "tmp:/"]
+        if fs.Exists(v + base + ".ok") then DeleteFile(v + base + ".ok")
+        for n = 0 to 400
+            p = v + base + "_" + n.ToStr() + ".txt"
+            if not fs.Exists(p) then exit for
+            DeleteFile(p)
+        end for
     end for
-    return ""
+end sub
+
+function storeCategory(fs as Object, kind as String, cid as String, pieces as Object, count as Integer, key as String) as Boolean
+    deleteCategoryFiles(fs, kind, cid)
+    base = "svidx_" + kind + "_c" + fileKey(cid)
+    vol = ""
+    volCode = ""
+    for each v in ["cachefs:/", "tmp:/"]
+        good = true
+        for n = 0 to pieces.Count() - 1
+            p = v + base + "_" + n.ToStr() + ".txt"
+            if not WriteAsciiFile(p, pieces[n]) then
+                good = false
+                exit for
+            end if
+            if ReadAsciiFile(p) <> pieces[n] then
+                good = false
+                exit for
+            end if
+        end for
+        if good then
+            vol = v
+            volCode = "c"
+            if v = "tmp:/" then volCode = "t"
+            exit for
+        end if
+        deleteCategoryFiles(fs, kind, cid)
+    end for
+    if vol = "" then return false
+
+    sep = Chr(9)
+    marker = nowSecs().ToStr() + sep + pieces.Count().ToStr() + sep + count.ToStr() + sep + key + sep + volCode
+    return WriteAsciiFile(vol + base + ".ok", marker)
 end function
 
 sub run()
@@ -93,6 +132,8 @@ sub run()
     action = "get_live_streams"
     idField = "stream_id"
     iconField = "stream_icon"
+    withIcon = false
+    if kind = "live" then withIcon = true
     if kind = "vod" then
         action = "get_vod_streams"
     else if kind = "series" then
@@ -102,59 +143,35 @@ sub run()
     end if
 
     base = m.top.server + "/player_api.php?username=" + urlEnc(m.top.user) + "&password=" + urlEnc(m.top.pass) + "&action=" + action + "&category_id="
+    fs = CreateObject("roFileSystem")
+    if m.top.cleanup then cleanOldIndexFiles()
 
     ids = m.top.cats
-    total = ids.Count()
-    count = 0
+    key = m.top.key
     fails = 0
-    shards = []
-    buf = ""
+    skipped = 0
+    items = 0
 
-    for i = 0 to total - 1
+    for i = 0 to ids.Count() - 1
         cid = ids[i]
-        res = invalid
-        for attempt = 1 to 3
-            res = fetchCategory(base, cid, idField, iconField)
-            if res <> invalid then exit for
-            if attempt < 3 then sleep(600 * attempt)
-        end for
-
-        if res = invalid then
-            fails = fails + 1
+        if not m.top.force and markerFresh(fs, kind, cid, key) then
+            skipped = skipped + 1
         else
-            count = count + res.n
-            buf = buf + res.chunk
-            if Len(buf) > 120000 then
-                shards.push(buf)
-                buf = ""
+            res = invalid
+            for attempt = 1 to 3
+                res = fetchCategory(base, cid, idField, iconField, withIcon)
+                if res <> invalid then exit for
+                if attempt < 3 then sleep(600 * attempt)
+            end for
+            if res = invalid then
+                fails = fails + 1
+            else if storeCategory(fs, kind, cid, res.pieces, res.n, key) then
+                items = items + res.n
+            else
+                fails = fails + 1
             end if
         end if
         m.top.progress = i + 1
     end for
-    if buf <> "" then shards.push(buf)
-
-    if count = 0 or fails * 2 > total then
-        m.top.result = { ok: false, count: count, fails: fails, shards: 0, vol: "", err: fails.ToStr() + " of " + total.ToStr() + " categories failed" }
-        return
-    end if
-
-    ' start from a clean slate, then store + verify (cache first, tmp second)
-    cleanIndexFiles()
-    vol = ""
-    errs = ""
-    for each v in ["cachefs:/", "tmp:/"]
-        e = writeShards(v, shards, kind)
-        if e = "" then
-            vol = v
-            exit for
-        end if
-        errs = errs + e + ";  "
-        cleanIndexFiles()
-    end for
-
-    if vol = "" then
-        m.top.result = { ok: false, count: count, fails: fails, shards: 0, vol: "", err: "cannot store the index: " + errs + usageNote() }
-        return
-    end if
-    m.top.result = { ok: true, count: count, fails: fails, shards: shards.Count(), vol: vol, err: "" }
+    m.top.result = { ok: true, fails: fails, skipped: skipped, items: items }
 end sub

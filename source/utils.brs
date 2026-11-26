@@ -577,26 +577,26 @@ end function
 ' Voice entry: ask a StandardKeyboardDialog for full-word dictation (search boxes).
 ' Roku has two settings: the dialog's keyboardDomain and the voiceEntryType of its
 ' inner voice text box (a keyboard's inner box can default to letter-by-letter).
-' What exists and what was set is written to the debug log.
 sub setVoiceGeneric(dlg as Object, label as String)
-    info = ""
-    if dlg.hasField("keyboardDomain") then
-        dlg.keyboardDomain = "generic"
-        info = info + "keyboardDomain=" + toS(dlg.keyboardDomain)
-    else
-        info = info + "keyboardDomain=<no such field>"
-    end if
+    if dlg.hasField("keyboardDomain") then dlg.keyboardDomain = "generic"
     tb = fldOf(dlg, "textEditBox")
     if tb <> invalid then
         if tb.hasField("voiceEnabled") then tb.voiceEnabled = true
-        if tb.hasField("voiceEntryType") then
-            tb.voiceEntryType = "generic"
-            info = info + "  voiceEntryType=" + toS(tb.voiceEntryType)
-        else
-            info = info + "  voiceEntryType=<no such field>"
-        end if
-    else
-        info = info + "  textEditBox=<not available>"
+        if tb.hasField("voiceEntryType") then tb.voiceEntryType = "generic"
     end if
-    logLine("voice entry (" + label + "): " + info)
 end sub
+
+' category id -> safe part of a file name
+function fileKey(cid as String) as String
+    out = ""
+    for i = 1 to Len(cid)
+        ch = Mid(cid, i, 1)
+        a = Asc(ch)
+        if (a >= 48 and a <= 57) or (a >= 65 and a <= 90) or (a >= 97 and a <= 122) or ch = "-" then
+            out = out + ch
+        else
+            out = out + "_" + a.ToStr() + "_"
+        end if
+    end for
+    return out
+end function

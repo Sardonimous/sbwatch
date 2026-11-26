@@ -1009,6 +1009,7 @@ sub toggleFav(id as String, title as String, iconIn as Dynamic)
     end for
 
     if found >= 0 then
+        m.lastFavRemoved = { k: favKey(), id: id, idx: found, t: nowSecs() }
         favs.Delete(found)
         note = "Removed from favorites"
     else
@@ -1018,6 +1019,17 @@ sub toggleFav(id as String, title as String, iconIn as Dynamic)
         end if
         favs.push({ id: id, title: title, icon: icon })
         note = "Added to favorites"
+        ' re-adding what was just removed puts it back where it was
+        rm = m.lastFavRemoved
+        if rm <> invalid then
+            if rm.k = favKey() and rm.id = id and nowSecs() - rm.t < 600 then
+                last = favs.Count() - 1
+                at = rm.idx
+                if at > last then at = last
+                favs = favReorderArray(favs, last, at)
+                m.lastFavRemoved = invalid
+            end if
+        end if
     end if
 
     if not saveList(favKey(), favs) then

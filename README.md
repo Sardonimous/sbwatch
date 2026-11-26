@@ -14,7 +14,7 @@ SBWatch is only a player. You supply your own Xtream provider; no content or cre
 - Channel logos next to channel names (list, guide, now/next panel, playback banner)
 - Now/next panel with color-coded, scrollable program cards
 - Full time-grid guide (fetched lazily for the visible rows only)
-- Search: whole-provider channel search (on-device name index) and program-title search in the open channel list
+- Search: channel / movie / series search over an on-device name index limited by the category filter and program-title search in the open channel list
 - Favorites and recently watched
 - HLS playback with automatic MPEG-TS fallback; stream "nerd" info panel
 
@@ -92,8 +92,8 @@ Errors are echoed to the Roku debug console (`telnet ROKU_IP 8085`) with a time 
 - **A / B buttons:** on remotes that have them (Roku reports the key names as `A` and `B`), A toggles the favorite star (it also works during playback, where the system captures `*`) and B turns closed captions on or off. Roku does not document how A/B reach apps; if they ever stop working, press them while watching the debug console (`telnet ROKU_IP 8085`): SBWatch prints the key name of any key it does not recognize.
 - The stream info panel hides itself after 15 seconds.
 - The help line at the bottom of the main screen changes with context (categories, channels, Favorites, program guide, moving a channel).
-- Search dialog: **Search channels**, **Search program guide (current channel list)**, **Rebuild channel search index** (Back closes the dialog). If the index file is found to be incomplete, SBWatch rebuilds it once per session and re-runs the search. An empty channel search reports how many channels are indexed and whether the index is incomplete.
-- Search index: fetched category by category (progress top right) and stored as small verified files in the Roku's cache (or temporary storage if the cache is unusable); old index files are wiped before each rebuild. Refreshed every ~3 days. The index code is generic (`live` / `vod` / `series`).
+- Search dialog: **Search channels / movies / series**, **Search program guide (current channel list)** (Live TV), **Rebuild ... search index** (Back closes the dialog). If part of the index is found damaged, SBWatch rebuilds just that part once per session and re-runs the search. An empty search reports how many titles were indexed and whether some categories could not be.
+- **Search index and the category filter:** the index is kept per category, and a search covers only the categories that match your category filter (all categories when no filter is set), so set a filter such as "english" first to make searching and indexing much faster. Before searching, the categories in scope that are not yet indexed (or older than 3 days) are fetched, four at a time (progress top right); categories that are already up to date are skipped. Movies and Series store names only (no poster addresses), which keeps the index small; Live TV also stores channel logos. Each category is stored in its own small verified files in the Roku's cache (or temporary storage if the cache is unusable). "Rebuild search index" re-fetches the categories in scope. The index code is generic (`live` / `vod` / `series`).
 - Guide data comes from Xtream `get_short_epg`, per channel, cached 5 minutes. There is no provider-wide guide search (Xtream has none, and full XMLTV is too large for a Roku).
 - Stream resolution is shown only if the stream's playlist declares it; Roku does not expose decoder resolution to apps.
 - The category filter is remembered across restarts (clear it from the filter dialog).

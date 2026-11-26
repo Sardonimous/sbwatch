@@ -13,8 +13,14 @@ sub searchInit()
     m.lastQuery = ""
     m.pendingQuery = ""
     m.idxBuilding = false
-    m.idxTask = invalid
+    m.idxWorkers = []
+    m.idxProg = []
+    m.idxFinished = 0
     m.idxTotal = 0
+    m.idxFails = 0
+    m.idxItems = 0
+    m.idxSkipped = 0
+    m.idxFull = false
     m.idxLabel = m.top.findNode("idxStatus")
     m.sdlg = invalid
     m.es = invalid
@@ -22,8 +28,8 @@ sub searchInit()
     m.pendingResults = invalid
     m.catMap = {}
     m.autoRebuilt = false
-    m.partialRetried = false
     m.searchActs = []
+    m.searchCats = []
     m.idxKind = "live"
     m.idxNoun = "channels"
 end sub
@@ -43,88 +49,117 @@ function indexState(kind as String) as String
     j = readIndexMeta(kind)
     if j = invalid then return "none"
     if toS(j.key) <> m.server + "|" + m.user then return "none"
-    if Int(Val(toS(j.ver))) < 3 then return "none"
-    if Int(Val(toS(j.shards))) < 1 then return "none"
-    age = nowSecs() - Int(Val(toS(j.ts)))
-    if Int(Val(toS(j.fails))) > 0 and age > 600 and not m.partialRetried then return "stale"
-    if age > 259200 then return "stale"
+    if Int(Val(toS(j.ver))) < 4 then return "none"
+    if nowSecs() - Int(Val(toS(j.ts))) > 259200 then return "stale"
     return "ok"
 end function
 
 sub maybeBuildIndex()
     if m.mode <> "live" then return
-    if indexState("live") <> "ok" then startIndexBuild("live")
+    if indexState("live") <> "ok" then startIndexBuild("live", allCatIds(), false)
 end sub
 
-sub startIndexBuild(kind as String)
+' Indexes the given categories with up to 4 workers at once. Categories whose
+' index is already recent are skipped unless force is set.
+sub startIndexBuild(kind as String, cats as Object, force as Boolean)
     if kind <> m.mode then return
     if m.idxBuilding then
         showStatus("A search index is already being built", 3)
         return
     end if
-    if m.allCats.Count() = 0 then return
+    n = cats.Count()
+    if n = 0 then return
 
-    ids = []
-    m.catMap = {}
-    for each c in m.allCats
-        ids.push(c.id)
-        m.catMap[c.id] = c.title
+    workers = 4
+    if n < workers then workers = n
+    slices = []
+    for w = 0 to workers - 1
+        slices.push([])
+    end for
+    for i = 0 to n - 1
+        slices[i mod workers].push(cats[i])
     end for
 
-    t = CreateObject("roSGNode", "IndexTask")
-    t.kind = kind
-    t.server = m.server
-    t.user = m.user
-    t.pass = m.pass
-    t.cats = ids
-    t.observeField("progress", "onIdxProgress")
-    t.observeField("state", "onIdxState")
-    m.idxTask = t
+    m.idxWorkers = []
+    m.idxProg = []
+    for w = 0 to workers - 1
+        t = CreateObject("roSGNode", "IndexTask")
+        t.id = "w" + w.ToStr()
+        t.kind = kind
+        t.server = m.server
+        t.user = m.user
+        t.pass = m.pass
+        t.key = m.server + "|" + m.user
+        t.cats = slices[w]
+        t.force = force
+        t.cleanup = (w = 0)
+        t.observeField("progress", "onIdxProgress")
+        t.observeField("state", "onIdxState")
+        m.idxWorkers.push(t)
+        m.idxProg.push(0)
+    end for
+
     m.idxKind = kind
     m.idxNoun = kindNoun(kind)
-    m.idxTotal = ids.Count()
-    regWrite("idxmeta_" + kind, "")
+    m.idxTotal = n
+    m.idxFinished = 0
+    m.idxFails = 0
+    m.idxItems = 0
+    m.idxSkipped = 0
+    m.idxFull = (n = m.allCats.Count())
     m.idxBuilding = true
     m.partialRetried = true
-    m.idxLabel.text = "Indexing " + m.idxNoun + " 0/" + m.idxTotal.ToStr()
+    m.idxLabel.text = "Indexing " + m.idxNoun + " 0/" + n.ToStr()
     m.idxLabel.visible = true
-    t.control = "RUN"
+    for each t in m.idxWorkers
+        t.control = "RUN"
+    end for
 end sub
 
 sub onIdxProgress(event as Object)
     if not m.idxBuilding then return
-    m.idxLabel.text = "Indexing " + m.idxNoun + " " + event.getData().ToStr() + "/" + m.idxTotal.ToStr()
+    t = event.getRoSGNode()
+    w = Int(Val(Mid(t.id, 2)))
+    if w < 0 or w >= m.idxProg.Count() then return
+    m.idxProg[w] = event.getData()
+    done = 0
+    for each p in m.idxProg
+        done = done + p
+    end for
+    m.idxLabel.text = "Indexing " + m.idxNoun + " " + done.ToStr() + "/" + m.idxTotal.ToStr()
 end sub
 
 sub onIdxState(event as Object)
     t = event.getRoSGNode()
     if t.state <> "stop" then return
-    if m.idxTask = invalid then return
-    if not t.IsSameNode(m.idxTask) then return
+    if not m.idxBuilding then return
+    res = t.result
+    if res <> invalid then
+        m.idxFails = m.idxFails + res.fails
+        m.idxItems = m.idxItems + res.items
+        m.idxSkipped = m.idxSkipped + res.skipped
+    end if
+    m.idxFinished = m.idxFinished + 1
+    if m.idxFinished >= m.idxWorkers.Count() then finishIndexBuild()
+end sub
 
+sub finishIndexBuild()
     m.idxBuilding = false
     m.idxLabel.visible = false
-    res = t.result
-    if res = invalid then
-        m.pendingQuery = ""
-        return
+    kind = m.idxKind
+    if kind = "live" and m.idxFull and m.idxFails = 0 then
+        regWrite("idxmeta_live", FormatJson({ ts: nowSecs(), ver: 4, key: m.server + "|" + m.user }))
     end if
-    if not res.ok then
-        m.pendingQuery = ""
-        showStatus("Search index failed: " + res.err, 6)
-        return
-    end if
-
-    regWrite("idxmeta_" + t.kind, FormatJson({ ts: nowSecs(), count: res.count, fails: res.fails, ver: 3, shards: res.shards, vol: res.vol, key: t.server + "|" + t.user }))
 
     q = m.pendingQuery
     m.pendingQuery = ""
-    if q <> "" and t.kind = m.mode then
+    if q <> "" and kind = m.mode then
+        if m.idxFails > 0 then showStatus(m.idxFails.ToStr() + " categories could not be indexed - searching the rest", 3)
         runSearchTask(q)
     else
         note = ""
-        if res.fails > 0 then note = "  (" + res.fails.ToStr() + " categories could not be read)"
-        showStatus("Search index ready: " + res.count.ToStr() + " " + kindNoun(t.kind) + note, 5)
+        if m.idxFails > 0 then note = "  (" + m.idxFails.ToStr() + " categories could not be read)"
+        showStatus("Search index ready: " + m.idxItems.ToStr() + " new " + kindNoun(kind) + " indexed" + note, 5)
     end if
 end sub
 
@@ -133,7 +168,10 @@ sub cancelSearchWork()
     m.es = invalid
     m.esIds = {}
     m.pendingResults = invalid
-    if m.idxTask <> invalid then m.idxTask.control = "STOP"
+    for each t in m.idxWorkers
+        t.control = "STOP"
+    end for
+    m.idxWorkers = []
     m.idxBuilding = false
     m.idxLabel.visible = false
 end sub
@@ -144,6 +182,7 @@ sub openSearchDialog()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Search"
     if m.mode <> "live" then dlg.title = "Search " + modeName()
+    if m.catFilter <> "" then dlg.title = dlg.title + "  (category filter on)"
     dlg.text = m.lastQuery
     setVoiceGeneric(dlg, "search")
     if m.mode = "live" then
@@ -169,7 +208,13 @@ sub onSearchButton(event as Object)
     act = m.searchActs[idx]
 
     if act = "rebuild" then
-        startIndexBuild(m.mode)
+        cats = scopeCats()
+        if cats.Count() = 0 then
+            showStatus("No categories match the filter", 3)
+            return
+        end if
+        showStatus("Rebuilding the index for " + cats.Count().ToStr() + " categories ...", 4)
+        startIndexBuild(m.mode, cats, true)
         return
     end if
 
@@ -189,43 +234,41 @@ end sub
 
 ' ---------------- channel search ----------------
 
+' The category filter limits both what is indexed and what is searched.
 sub startChannelSearch(q as String)
+    cats = scopeCats()
+    if cats.Count() = 0 then
+        showStatus("No categories match the filter - clear the filter to search everything", 4)
+        return
+    end if
     if m.idxBuilding then
         if m.idxKind <> m.mode then
             showStatus("Another search index is being built - try again in a moment", 4)
             return
         end if
         m.pendingQuery = q
-        showStatus("Search index is still being built - your search will run when it is ready", 0)
+        m.searchCats = cats
+        showStatus("The search index is still being built - your search will run when it is ready", 0)
         return
     end if
 
-    st = indexState(m.mode)
-    if st = "none" then
-        m.pendingQuery = q
-        startIndexBuild(m.mode)
-        showStatus("Building search index (first time only) - your search will run when it is ready", 0)
-        return
-    end if
-    if st = "stale" then startIndexBuild(m.mode)
-    runSearchTask(q)
+    m.pendingQuery = q
+    m.searchCats = cats
+    showStatus("Preparing the search ...", 0)
+    ' categories that are already indexed are skipped, so this is quick when up to date
+    startIndexBuild(m.mode, cats, false)
 end sub
 
 sub runSearchTask(q as String)
     kind = m.mode
-    meta = readIndexMeta(kind)
-    if meta = invalid then
-        m.pendingQuery = q
-        startIndexBuild(kind)
-        showStatus("Building search index - your search will run when it is ready", 0)
-        return
-    end if
-    showStatus("Searching ...", 0)
+    scope = ""
+    if m.catFilter <> "" then scope = " in " + m.searchCats.Count().ToStr() + " categories"
+    showStatus("Searching" + scope + " ...", 0)
     t = CreateObject("roSGNode", "SearchTask")
     t.kind = kind
-    t.shards = Int(Val(toS(meta.shards)))
-    t.vol = toS(meta.vol)
     t.query = q
+    t.key = m.server + "|" + m.user
+    t.cats = m.searchCats
     t.catMap = m.catMap
     t.observeField("state", "onSearchDone")
     m.srchTask = t
@@ -240,38 +283,28 @@ sub onSearchDone(event as Object)
     if kind <> m.mode then return
 
     if t.errorMsg <> "" then
-        if t.errorMsg = "index missing" then
-            m.pendingQuery = q
-            startIndexBuild(kind)
-            showStatus("Rebuilding search index - your search will run when it is ready", 0)
-        else
-            showStatus("Search failed: " + t.errorMsg, 5)
-        end if
+        showStatus("Search failed: " + t.errorMsg, 5)
         return
     end if
 
-    ' Self-heal: an index file with fewer entries than the build recorded is
-    ' truncated; rebuild it once per session and re-run the search.
-    if not m.autoRebuilt and t.indexed > 0 then
-        meta = readIndexMeta(kind)
-        if meta <> invalid then
-            expected = Int(Val(toS(meta.count)))
-            if expected > 0 and t.indexed * 100 < expected * 99 then
-                m.autoRebuilt = true
-                m.pendingQuery = q
-                startIndexBuild(kind)
-                showStatus("Search index was incomplete - rebuilding; your search will run when it is ready", 0)
-                return
-            end if
-        end if
+    ' Self-heal: categories whose index files are damaged or incomplete are
+    ' rebuilt (once per session) and the search is run again.
+    if not m.autoRebuilt and t.bad.Count() > 0 then
+        m.autoRebuilt = true
+        m.pendingQuery = q
+        showStatus("Part of the search index was damaged - rebuilding " + t.bad.Count().ToStr() + " categories", 0)
+        startIndexBuild(kind, t.bad, true)
+        return
     end if
 
     noun = kindNoun(kind)
     node = t.content
     shown = node.getChildCount()
-    label = t.total.ToStr() + " " + noun + " match '" + q + "'"
-    if t.total = 0 then label = zeroNote(q, t.indexed, kind)
-    if t.total > shown then label = "Showing " + shown.ToStr() + " of " + t.total.ToStr() + " " + noun + " matching '" + q + "' - refine your search"
+    scope = ""
+    if m.catFilter <> "" then scope = "  (categories matching the filter)"
+    label = t.total.ToStr() + " " + noun + " match '" + q + "'" + scope
+    if t.total = 0 then label = zeroNote(q, t.indexed, kind, t.missing)
+    if t.total > shown then label = "Showing " + shown.ToStr() + " of " + t.total.ToStr() + " " + noun + " matching '" + q + "' - refine your search" + scope
     deliverResults(node, label, "No " + noun + " match '" + q + "'")
 end sub
 
@@ -416,14 +449,38 @@ sub showPendingResults()
 end sub
 
 ' Explains an empty result: how big the index is and whether it is incomplete.
-function zeroNote(q as String, indexed as Integer, kind as String) as String
+function zeroNote(q as String, indexed as Integer, kind as String, missing as Integer) as String
     s = "0 of " + indexed.ToStr() + " indexed " + kindNoun(kind) + " match '" + q + "'"
-    j = readIndexMeta(kind)
-    if j <> invalid then
-        expected = Int(Val(toS(j.count)))
-        fails = Int(Val(toS(j.fails)))
-        if fails > 0 then s = s + " - index incomplete (" + fails.ToStr() + " categories failed): use Rebuild index"
-        if expected > 0 and indexed < expected then s = s + " - index has " + indexed.ToStr() + " of " + expected.ToStr() + " entries: use Rebuild index"
-    end if
+    if m.catFilter <> "" then s = s + " (in the categories matching the filter)"
+    if missing > 0 then s = s + " - " + missing.ToStr() + " categories could not be indexed; use Rebuild index"
     return s
+end function
+
+' ids of the categories the search covers: those matching the category filter
+' (all of them when no filter is set)
+function scopeCats() as Object
+    ids = []
+    words = []
+    if m.catFilter <> "" then
+        for each w in m.catFilter.Tokenize(" ")
+            words.push(w)
+        end for
+    end if
+    for each c in m.allCats
+        low = LCase(c.title)
+        good = true
+        for each w in words
+            if Instr(1, low, w) = 0 then good = false
+        end for
+        if good then ids.push(c.id)
+    end for
+    return ids
+end function
+
+function allCatIds() as Object
+    ids = []
+    for each c in m.allCats
+        ids.push(c.id)
+    end for
+    return ids
 end function
