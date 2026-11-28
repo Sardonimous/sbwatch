@@ -29,6 +29,8 @@ sub vodInit()
     m.seriesData = invalid
     m.pendingItem = invalid
     m.vodListIdx = -1
+    m.infoCache = {}
+    m.infoPending = {}
     m.itemMenuIdx = 0
     m.menuActs = []
     m.titleLbl = m.top.findNode("title")
@@ -192,9 +194,26 @@ end function
 sub updateVodPanel(item as Object)
     m.epgText.visible = false
     m.epgList.visible = false
-    setLogo(m.vodPoster, item.HDPosterUrl)
 
     lk = m.listKind
+    ic = item.HDPosterUrl
+    if ic = invalid then ic = ""
+
+    ' Search results carry no poster: look the title up (cached) while it is highlighted
+    info = invalid
+    wantInfo = false
+    if lk = "movies" or lk = "series" then
+        ck = m.mode + ":" + item.id
+        if m.infoCache.DoesExist(ck) then
+            info = m.infoCache[ck]
+            if ic = "" then ic = info.image
+        else if ic = "" then
+            wantInfo = true
+            requestPanelInfo(item)
+        end if
+    end if
+    setLogo(m.vodPoster, ic)
+
     key = ""
     if lk = "movies" then key = "m" + item.id
     if lk = "episodes" then key = "e" + item.id
@@ -203,7 +222,17 @@ sub updateVodPanel(item as Object)
     nl = Chr(10)
     txt = ""
     rating = nodeStr(item, "rating")
+    if (rating = "" or rating = "0") and info <> invalid then rating = info.rating
     if rating <> "" and rating <> "0" then txt = "Rating: " + rating + nl
+    if info <> invalid then
+        meta = info.year
+        if info.dur > 0 then meta = joinMeta(meta, fmtDur(info.dur))
+        if info.genre <> "" then meta = joinMeta(meta, info.genre)
+        if meta <> "" then txt = txt + meta + nl
+        if info.vinfo <> "" or info.ainfo <> "" then txt = txt + "Video " + info.vinfo + "   Audio " + info.ainfo + nl
+        pw = audioWarn(info.ainfo)
+        if pw <> "" then txt = txt + "No sound expected: Roku cannot play " + info.ainfo + nl
+    end if
     if lk = "episodes" then
         dur = Int(Val(nodeStr(item, "dur")))
         if dur > 0 then txt = txt + fmtDur(dur) + nl
@@ -212,7 +241,10 @@ sub updateVodPanel(item as Object)
     if key <> "" then e = resumeFor(key)
     if e <> invalid then txt = txt + "Resume at " + fmtDur(e.p) + " of " + fmtDur(e.d) + nl
     plot = nodeStr(item, "plot")
+    if plot = "" and info <> invalid then plot = info.plot
+    if Len(plot) > 330 then plot = Left(plot, 327) + "..."
     if plot <> "" then txt = txt + nl + plot + nl
+    if wantInfo then txt = txt + nl + "Loading details ..." + nl
     if lk = "series" then
         txt = txt + nl + "OK: open series"
     else if lk = "seasons" then
@@ -954,3 +986,47 @@ function favCap() as Integer
     if m.mode = "live" then return 75
     return 40
 end function
+
+' ---------------------------------------------------------------------
+' Poster / details for a highlighted title that has none (search results)
+' ---------------------------------------------------------------------
+
+sub requestPanelInfo(item as Object)
+    ck = m.mode + ":" + item.id
+    if m.infoPending.DoesExist(ck) then return
+    m.infoPending[ck] = true
+    if m.mode = "vod" then
+        runTask("vodinfo", apiUrl("get_vod_info", "&vod_id=" + urlEnc(item.id)), item.id, "onPanelInfo")
+    else
+        runTask("seriesinfo", apiUrl("get_series_info", "&series_id=" + urlEnc(item.id)), item.id, "onPanelInfo")
+    end if
+end sub
+
+sub onPanelInfo(event as Object)
+    t = event.getRoSGNode()
+    if t.state <> "stop" then return
+    mk = "vod"
+    if t.kind = "seriesinfo" then mk = "series"
+    ck = mk + ":" + t.param
+    if m.infoPending.DoesExist(ck) then m.infoPending.Delete(ck)
+
+    entry = { image: "", plot: "", rating: "", year: "", genre: "", dur: 0, vinfo: "", ainfo: "" }
+    d = t.data
+    if t.errorMsg = "" and d <> invalid then
+        if mk = "vod" then
+            entry = { image: d.image, plot: d.plot, rating: d.rating, year: d.year, genre: d.genre, dur: d.dur, vinfo: d.vinfo, ainfo: d.ainfo }
+        else
+            entry = { image: d.cover, plot: d.plot, rating: d.rating, year: d.year, genre: d.genre, dur: 0, vinfo: "", ainfo: "" }
+        end if
+    end if
+    if m.infoCache.Count() > 200 then m.infoCache = {}
+    m.infoCache[ck] = entry
+
+    ' refresh the panel if this title is still the highlighted one
+    item = currentFocusedItem()
+    if item = invalid then return
+    if m.mode <> mk then return
+    if item.id <> t.param then return
+    if entry.image <> "" and item.hasField("HDPosterUrl") then item.HDPosterUrl = entry.image
+    updateVodPanel(item)
+end sub

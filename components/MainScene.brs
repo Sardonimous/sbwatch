@@ -39,6 +39,7 @@ sub init()
     m.nerdHideTimer.observeField("fire", "onNerdHide")
     m.prevChan = invalid
     m.playingName = ""
+    m.guideAfterLoad = false
     m.pendingRecent = invalid
     m.capChan = 1
 
@@ -343,23 +344,28 @@ end sub
 ' ---------------------------------------------------------------------
 
 sub onCatSelected(event as Object)
-    idx = event.getData()
+    selectCategory(event.getData(), false)
+end sub
+
+' OK on a category row. wantGuide (Live TV only) opens the full guide once the list is showing.
+sub selectCategory(idx as Integer, wantGuide as Boolean)
     cat = m.catList.content.getChild(idx)
     if cat = invalid then return
 
     if cat.id = "__filter" then
-        openFilterDialog()
+        if not wantGuide then openFilterDialog()
         return
     end if
     if cat.id = "__search" then
-        openSearchDialog()
+        if not wantGuide then openSearchDialog()
         return
     end if
     if cat.id = "__mode" then
-        openModeMenu()
+        if not wantGuide then openModeMenu()
         return
     end if
 
+    m.guideAfterLoad = wantGuide
     m.curCat = cat.id
     m.navStack = []
     if m.mode <> "live" then
@@ -377,11 +383,40 @@ sub onCatSelected(event as Object)
     end if
 end sub
 
+' Right (and Replay on Live TV = full guide) on a category: the same as OK, except that a list
+' that is already showing this category is kept instead of being fetched again.
+sub openFocusedCategory(wantGuide as Boolean)
+    c0 = m.catList.content
+    if c0 = invalid then return
+    idx = m.catList.itemFocused
+    cat = c0.getChild(idx)
+    if cat = invalid then return
+    if cat.id = "__filter" or cat.id = "__search" or cat.id = "__mode" then return
+
+    c = m.chList.content
+    keep = false
+    if c <> invalid and cat.id = m.curCat then
+        ' Favorites / Recently Watched / Continue Watching can change, so they are always rebuilt
+        if cat.id <> "__fav" and cat.id <> "__rec" and cat.id <> "__cont" then
+            if c.getChildCount() > 0 then keep = true
+        end if
+    end if
+
+    if keep then
+        m.chList.setFocus(true)
+        scheduleEpg()
+        if wantGuide and m.mode = "live" then openGuide()
+    else
+        selectCategory(idx, wantGuide)
+    end if
+end sub
+
 sub onStreams(event as Object)
     t = event.getRoSGNode()
     if t.state <> "stop" then return
     if t.param <> m.curCat then return
     if t.errorMsg <> "" then
+        m.guideAfterLoad = false
         showStatus("Could not load the list: " + t.errorMsg, 0)
         return
     end if
@@ -391,6 +426,8 @@ sub onStreams(event as Object)
 end sub
 
 sub showChannels(node as Object, emptyMsg as String)
+    wantGuide = m.guideAfterLoad
+    m.guideAfterLoad = false
     showStars = false
     if m.curCat <> "__fav" then
         slk = m.listKind
@@ -409,6 +446,7 @@ sub showChannels(node as Object, emptyMsg as String)
     m.chList.setFocus(true)
     showStatus(n.ToStr() + " " + listNoun(), 3)
     scheduleEpg()
+    if wantGuide and m.mode = "live" then openGuide()
 end sub
 
 function currentFocusedItem() as Object
@@ -1177,8 +1215,12 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             else
                 toggleFavFocused()
             end if
-        else if key = "options" then
-            beginLogin()
+        else if m.catList.isInFocusChain() then
+            if key = "a" then
+                searchFocusedCategory()
+            else
+                beginLogin()
+            end if
         end if
         return true
     else if key = "b" then
@@ -1188,7 +1230,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         end if
     else if key = "replay" then
         if m.catList.isInFocusChain() then
-            openSearchDialog()
+            if m.mode = "live" then openFocusedCategory(true)
             return true
         else if m.chList.isInFocusChain() then
             if m.mode = "live" then openGuide()
@@ -1203,11 +1245,9 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             return true
         end if
     else if key = "right" then
-        if m.catList.isInFocusChain() and m.chList.content <> invalid then
-            if m.chList.content.getChildCount() > 0 then
-                m.chList.setFocus(true)
-                return true
-            end if
+        if m.catList.isInFocusChain() then
+            openFocusedCategory(false)
+            return true
         else if m.chList.isInFocusChain() and m.epgList.visible then
             m.epgList.setFocus(true)
             return true
@@ -1234,31 +1274,33 @@ sub updateHint()
     else if m.chList.isInFocusChain() then
         lk = m.listKind
         if m.curCat = "__rec" then
-            txt = "RECENTLY WATCHED     OK: play     *: remove item / clear list     A: favorite     Back: categories"
+            txt = "RECENTLY WATCHED     OK: play     *: remove item / clear list     A: favorite"
         else if m.curCat = "__cont" then
-            txt = "CONTINUE WATCHING     OK: resume or start over     *: remove item / clear list     A: favorite     Back: categories"
+            txt = "CONTINUE WATCHING     OK: resume or start over     *: remove item / clear list     A: favorite"
         else if m.curCat = "__fav" and m.mode <> "live" then
-            txt = "FAVORITES     OK: open / play     *: move / remove favorite     A: remove favorite     Back: categories"
+            txt = "FAVORITES     OK: open / play     *: move / remove favorite     A: remove favorite"
         else if m.mode = "live" then
             if m.curCat = "__fav" then
-                txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide     Right: program guide     Back: categories"
+                txt = "FAVORITES     OK: play     *: move / remove favorite     Replay: full guide"
             else
-                txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide     Right: program guide     Back: categories"
+                txt = "CHANNELS     OK: play     *: add / remove favorite     Replay: full guide"
             end if
         else if lk = "series" then
-            txt = "SERIES     OK: open series     A: add / remove favorite     Back: categories"
+            txt = "SERIES     OK: open series     A: add / remove favorite"
         else if lk = "seasons" then
             txt = "SEASONS     OK: open season     Back: back to the series list"
         else if lk = "episodes" then
             txt = "EPISODES     OK: details and play     Back: back to the seasons"
         else
-            txt = "MOVIES     OK: details and play     A: add / remove favorite     Back: categories"
+            txt = "MOVIES     OK: details and play     A: add / remove favorite"
         end if
         if lk <> "seasons" and lk <> "episodes" and txt <> "" then txt = txt + "     B: sort"
     else if m.catList.isInFocusChain() then
-        noun = "channels"
-        if m.mode <> "live" then noun = "titles"
-        txt = "CATEGORIES     OK: open / run     Right: " + noun + "     Replay: search     *: change provider     Back: exit"
+        if m.mode = "live" then
+            txt = "CATEGORIES     OK or Right: open     A: search in it     Replay: full guide     *: change provider     Back: exit"
+        else
+            txt = "CATEGORIES     OK or Right: open     A: search in it     *: change provider     Back: exit"
+        end if
     end if
     if txt <> "" then m.hint.text = txt
 end sub

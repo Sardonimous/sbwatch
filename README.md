@@ -39,7 +39,9 @@ Credentials are stored in the Roku registry on the device, never in the package.
 | Lists | OK | open category / play channel |
 | Lists | Left / Right | move between category list, channel list, guide panel |
 | Category list | first rows | Search ...; Filter categories ... (the filter is remembered) |
-| Category list | Replay | open the search dialog |
+| Category list | Right | open the category (a list that is already showing it is kept, not fetched again) |
+| Category list | A | search inside the highlighted category only |
+| Category list | Replay | Live TV: open the category and its full guide |
 | Channel list | `*` | add / remove favorite |
 | Favorites list | `*` | menu: Move (Up/Down, OK to drop, Back to cancel), Move to top, Remove |
 | Channel list | Replay | open the full guide |
@@ -65,6 +67,9 @@ The search and filter boxes ask Roku for full-word voice entry (hold the microph
 ## Not available on Roku
 - The remote's streaming-service shortcut buttons (the "partner" buttons) are handled by the Roku system and are never sent to apps, so apps cannot use or block them. On remotes with programmable buttons they are assigned in the Roku settings.
 - Roku's built-in player decodes a fixed list of audio / video formats. A stream it cannot decode (for example "Unsupported AAC stream") cannot be played by an app; other players ship their own software decoders.
+
+## Press and hold
+Roku gives apps only a key-down and a key-up event, and the focused list consumes OK, so a press-and-hold of OK cannot be detected; the A and Replay buttons on the category list are used instead.
 
 ## Long names scroll
 In the category and channel / movie / series lists, a name that does not fit is shown with "..." and scrolls sideways while its row is highlighted.

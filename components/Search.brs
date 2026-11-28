@@ -30,6 +30,8 @@ sub searchInit()
     m.autoRebuilt = false
     m.searchActs = []
     m.searchCats = []
+    m.searchScopeCat = ""
+    m.searchScopeName = ""
     m.idxKind = "live"
     m.idxNoun = "channels"
 end sub
@@ -179,10 +181,39 @@ end sub
 ' ---------------- dialog ----------------
 
 sub openSearchDialog()
+    m.searchScopeCat = ""
+    m.searchScopeName = ""
+    buildSearchDialog()
+end sub
+
+' A on a category row: search inside that one category only
+sub searchFocusedCategory()
+    c0 = m.catList.content
+    if c0 = invalid then return
+    cat = c0.getChild(m.catList.itemFocused)
+    if cat = invalid then return
+    if cat.id = "__search" then
+        openSearchDialog()
+        return
+    end if
+    if Left(cat.id, 2) = "__" then
+        showStatus("Highlight a category to search inside it", 3)
+        return
+    end if
+    m.searchScopeCat = cat.id
+    m.searchScopeName = cat.title
+    buildSearchDialog()
+end sub
+
+sub buildSearchDialog()
     dlg = CreateObject("roSGNode", "StandardKeyboardDialog")
     dlg.title = "Search"
     if m.mode <> "live" then dlg.title = "Search " + modeName()
-    if m.catFilter <> "" then dlg.title = dlg.title + "  (category filter on)"
+    if m.searchScopeCat <> "" then
+        dlg.title = dlg.title + "  (highlighted category only)"
+    else if m.catFilter <> "" then
+        dlg.title = dlg.title + "  (category filter on)"
+    end if
     dlg.text = m.lastQuery
     setVoiceGeneric(dlg, "search")
     if m.mode = "live" then
@@ -262,7 +293,11 @@ end sub
 sub runSearchTask(q as String)
     kind = m.mode
     scope = ""
-    if m.catFilter <> "" then scope = " in " + m.searchCats.Count().ToStr() + " categories"
+    if m.searchScopeName <> "" then
+        scope = " in " + m.searchScopeName
+    else if m.catFilter <> "" then
+        scope = " in " + m.searchCats.Count().ToStr() + " categories"
+    end if
     showStatus("Searching" + scope + " ...", 0)
     t = CreateObject("roSGNode", "SearchTask")
     t.kind = kind
@@ -301,7 +336,11 @@ sub onSearchDone(event as Object)
     node = t.content
     shown = node.getChildCount()
     scope = ""
-    if m.catFilter <> "" then scope = "  (categories matching the filter)"
+    if m.searchScopeName <> "" then
+        scope = "  (in " + m.searchScopeName + ")"
+    else if m.catFilter <> "" then
+        scope = "  (categories matching the filter)"
+    end if
     label = t.total.ToStr() + " " + noun + " match '" + q + "'" + scope
     if t.total = 0 then label = zeroNote(q, t.indexed, kind, t.missing)
     if t.total > shown then label = "Showing " + shown.ToStr() + " of " + t.total.ToStr() + " " + noun + " matching '" + q + "' - refine your search" + scope
@@ -451,7 +490,11 @@ end sub
 ' Explains an empty result: how big the index is and whether it is incomplete.
 function zeroNote(q as String, indexed as Integer, kind as String, missing as Integer) as String
     s = "0 of " + indexed.ToStr() + " indexed " + kindNoun(kind) + " match '" + q + "'"
-    if m.catFilter <> "" then s = s + " (in the categories matching the filter)"
+    if m.searchScopeName <> "" then
+        s = s + " (in " + m.searchScopeName + ")"
+    else if m.catFilter <> "" then
+        s = s + " (in the categories matching the filter)"
+    end if
     if missing > 0 then s = s + " - " + missing.ToStr() + " categories could not be indexed; use Rebuild index"
     return s
 end function
@@ -459,6 +502,7 @@ end function
 ' ids of the categories the search covers: those matching the category filter
 ' (all of them when no filter is set)
 function scopeCats() as Object
+    if m.searchScopeCat <> "" then return [m.searchScopeCat]
     ids = []
     words = []
     if m.catFilter <> "" then
